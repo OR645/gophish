@@ -56,10 +56,15 @@ func (t *Template) Validate() error {
 	return nil
 }
 
-// GetTemplates returns the templates owned by the given user.
+// GetTemplates returns the templates owned by the given user. Administrators
+// receive the templates owned by every user.
 func GetTemplates(uid int64) ([]Template, error) {
 	ts := []Template{}
-	err := db.Where("user_id=?", uid).Find(&ts).Error
+	query := db.Model(&Template{})
+	if !userIsAdmin(uid) {
+		query = query.Where("user_id=?", uid)
+	}
+	err := query.Find(&ts).Error
 	if err != nil {
 		log.Error(err)
 		return ts, err
@@ -78,10 +83,15 @@ func GetTemplates(uid int64) ([]Template, error) {
 	return ts, err
 }
 
-// GetTemplate returns the template, if it exists, specified by the given id and user_id.
+// GetTemplate returns the template, if it exists, specified by the given id and
+// user_id. Administrators may retrieve a template owned by any user.
 func GetTemplate(id int64, uid int64) (Template, error) {
 	t := Template{}
-	err := db.Where("user_id=? and id=?", uid, id).Find(&t).Error
+	query := db.Where("id=?", id)
+	if !userIsAdmin(uid) {
+		query = query.Where("user_id=?", uid)
+	}
+	err := query.Find(&t).Error
 	if err != nil {
 		log.Error(err)
 		return t, err

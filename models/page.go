@@ -88,10 +88,15 @@ func (p *Page) Validate() error {
 	return p.parseHTML()
 }
 
-// GetPages returns the pages owned by the given user.
+// GetPages returns the pages owned by the given user. Administrators receive
+// the pages owned by every user.
 func GetPages(uid int64) ([]Page, error) {
 	ps := []Page{}
-	err := db.Where("user_id=?", uid).Find(&ps).Error
+	query := db.Model(&Page{})
+	if !userIsAdmin(uid) {
+		query = query.Where("user_id=?", uid)
+	}
+	err := query.Find(&ps).Error
 	if err != nil {
 		log.Error(err)
 		return ps, err
@@ -100,9 +105,14 @@ func GetPages(uid int64) ([]Page, error) {
 }
 
 // GetPage returns the page, if it exists, specified by the given id and user_id.
+// Administrators may retrieve a page owned by any user.
 func GetPage(id int64, uid int64) (Page, error) {
 	p := Page{}
-	err := db.Where("user_id=? and id=?", uid, id).Find(&p).Error
+	query := db.Where("id=?", id)
+	if !userIsAdmin(uid) {
+		query = query.Where("user_id=?", uid)
+	}
+	err := query.Find(&p).Error
 	if err != nil {
 		log.Error(err)
 	}

@@ -105,10 +105,15 @@ func (g *Group) Validate() error {
 	return nil
 }
 
-// GetGroups returns the groups owned by the given user.
+// GetGroups returns the groups owned by the given user. Administrators receive
+// the groups owned by every user.
 func GetGroups(uid int64) ([]Group, error) {
 	gs := []Group{}
-	err := db.Where("user_id=?", uid).Find(&gs).Error
+	query := db.Model(&Group{})
+	if !userIsAdmin(uid) {
+		query = query.Where("user_id=?", uid)
+	}
+	err := query.Find(&gs).Error
 	if err != nil {
 		log.Error(err)
 		return gs, err
@@ -126,7 +131,10 @@ func GetGroups(uid int64) ([]Group, error) {
 // created by the given uid.
 func GetGroupSummaries(uid int64) (GroupSummaries, error) {
 	gs := GroupSummaries{}
-	query := db.Table("groups").Where("user_id=?", uid)
+	query := db.Table("groups")
+	if !userIsAdmin(uid) {
+		query = query.Where("user_id=?", uid)
+	}
 	err := query.Select("id, name, modified_date").Scan(&gs.Groups).Error
 	if err != nil {
 		log.Error(err)
@@ -143,10 +151,15 @@ func GetGroupSummaries(uid int64) (GroupSummaries, error) {
 	return gs, nil
 }
 
-// GetGroup returns the group, if it exists, specified by the given id and user_id.
+// GetGroup returns the group, if it exists, specified by the given id and
+// user_id. Administrators may retrieve a group owned by any user.
 func GetGroup(id int64, uid int64) (Group, error) {
 	g := Group{}
-	err := db.Where("user_id=? and id=?", uid, id).Find(&g).Error
+	query := db.Where("id=?", id)
+	if !userIsAdmin(uid) {
+		query = query.Where("user_id=?", uid)
+	}
+	err := query.Find(&g).Error
 	if err != nil {
 		log.Error(err)
 		return g, err
@@ -161,7 +174,10 @@ func GetGroup(id int64, uid int64) (Group, error) {
 // GetGroupSummary returns the summary for the requested group
 func GetGroupSummary(id int64, uid int64) (GroupSummary, error) {
 	g := GroupSummary{}
-	query := db.Table("groups").Where("user_id=? and id=?", uid, id)
+	query := db.Table("groups").Where("id=?", id)
+	if !userIsAdmin(uid) {
+		query = query.Where("user_id=?", uid)
+	}
 	err := query.Select("id, name, modified_date").Scan(&g).Error
 	if err != nil {
 		log.Error(err)

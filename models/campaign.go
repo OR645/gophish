@@ -301,10 +301,16 @@ func getCampaignStats(cid int64) (CampaignStats, error) {
 	return s, err
 }
 
-// GetCampaigns returns the campaigns owned by the given user.
+// GetCampaigns returns the campaigns owned by the given user. Administrators
+// receive the campaigns owned by every user.
 func GetCampaigns(uid int64) ([]Campaign, error) {
 	cs := []Campaign{}
-	err := db.Model(&User{Id: uid}).Related(&cs).Error
+	var err error
+	if userIsAdmin(uid) {
+		err = db.Find(&cs).Error
+	} else {
+		err = db.Model(&User{Id: uid}).Related(&cs).Error
+	}
 	if err != nil {
 		log.Error(err)
 	}
@@ -323,7 +329,10 @@ func GetCampaignSummaries(uid int64) (CampaignSummaries, error) {
 	overview := CampaignSummaries{}
 	cs := []CampaignSummary{}
 	// Get the basic campaign information
-	query := db.Table("campaigns").Where("user_id = ?", uid)
+	query := db.Table("campaigns")
+	if !userIsAdmin(uid) {
+		query = query.Where("user_id = ?", uid)
+	}
 	query = query.Select("id, name, created_date, launch_date, send_by_date, completed_date, status")
 	err := query.Scan(&cs).Error
 	if err != nil {
@@ -346,7 +355,10 @@ func GetCampaignSummaries(uid int64) (CampaignSummaries, error) {
 // GetCampaignSummary gets the summary object for a campaign specified by the campaign ID
 func GetCampaignSummary(id int64, uid int64) (CampaignSummary, error) {
 	cs := CampaignSummary{}
-	query := db.Table("campaigns").Where("user_id = ? AND id = ?", uid, id)
+	query := db.Table("campaigns").Where("id = ?", id)
+	if !userIsAdmin(uid) {
+		query = query.Where("user_id = ?", uid)
+	}
 	query = query.Select("id, name, created_date, launch_date, send_by_date, completed_date, status")
 	err := query.Scan(&cs).Error
 	if err != nil {
@@ -394,10 +406,15 @@ func GetCampaignMailContext(id int64, uid int64) (Campaign, error) {
 	return c, nil
 }
 
-// GetCampaign returns the campaign, if it exists, specified by the given id and user_id.
+// GetCampaign returns the campaign, if it exists, specified by the given id and
+// user_id. Administrators may retrieve a campaign owned by any user.
 func GetCampaign(id int64, uid int64) (Campaign, error) {
 	c := Campaign{}
-	err := db.Where("id = ?", id).Where("user_id = ?", uid).Find(&c).Error
+	query := db.Where("id = ?", id)
+	if !userIsAdmin(uid) {
+		query = query.Where("user_id = ?", uid)
+	}
+	err := query.Find(&c).Error
 	if err != nil {
 		log.Errorf("%s: campaign not found", err)
 		return c, err
@@ -409,7 +426,12 @@ func GetCampaign(id int64, uid int64) (Campaign, error) {
 // GetCampaignResults returns just the campaign results for the given campaign
 func GetCampaignResults(id int64, uid int64) (CampaignResults, error) {
 	cr := CampaignResults{}
-	err := db.Table("campaigns").Where("id=? and user_id=?", id, uid).Find(&cr).Error
+	isAdmin := userIsAdmin(uid)
+	campaignQuery := db.Table("campaigns").Where("id=?", id)
+	if !isAdmin {
+		campaignQuery = campaignQuery.Where("user_id=?", uid)
+	}
+	err := campaignQuery.Find(&cr).Error
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"campaign_id": id,
@@ -417,7 +439,11 @@ func GetCampaignResults(id int64, uid int64) (CampaignResults, error) {
 		}).Error(err)
 		return cr, err
 	}
-	err = db.Table("results").Where("campaign_id=? and user_id=?", cr.Id, uid).Find(&cr.Results).Error
+	resultsQuery := db.Table("results").Where("campaign_id=?", cr.Id)
+	if !isAdmin {
+		resultsQuery = resultsQuery.Where("user_id=?", uid)
+	}
+	err = resultsQuery.Find(&cr.Results).Error
 	if err != nil {
 		log.Errorf("%s: results not found for campaign", err)
 		return cr, err

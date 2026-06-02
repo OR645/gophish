@@ -71,6 +71,19 @@ func GetRoleBySlug(slug string) (Role, error) {
 	return role, err
 }
 
+// userIsAdmin returns true if the user with the given id has the Admin role.
+// It is used by the object getters to let administrators view objects owned by
+// any user, while standard users remain scoped to their own objects. Any lookup
+// error is treated as "not an admin" so access defaults to the safe (scoped)
+// behavior.
+func userIsAdmin(uid int64) bool {
+	u, err := GetUser(uid)
+	if err != nil {
+		return false
+	}
+	return u.Role.Slug == RoleAdmin
+}
+
 // HasPermission checks to see if the user has a role with the requested
 // permission.
 func (u *User) HasPermission(slug string) (bool, error) {

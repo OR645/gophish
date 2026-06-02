@@ -96,7 +96,12 @@ func DeleteUser(id int64) error {
 			return err
 		}
 	}
-	campaigns, err := GetCampaigns(id)
+	// Note: the object getters (GetCampaigns, GetPages, etc.) return objects
+	// owned by every user when called for an admin. The deletion cascade below
+	// must only ever touch objects owned by the user being deleted, so we query
+	// for them directly with an explicit user_id filter instead.
+	campaigns := []Campaign{}
+	err = db.Where("user_id=?", id).Find(&campaigns).Error
 	if err != nil {
 		return err
 	}
@@ -110,7 +115,8 @@ func DeleteUser(id int64) error {
 	}
 	log.Infof("Deleting pages for user ID %d", id)
 	// Delete the landing pages
-	pages, err := GetPages(id)
+	pages := []Page{}
+	err = db.Where("user_id=?", id).Find(&pages).Error
 	if err != nil {
 		return err
 	}
@@ -122,7 +128,8 @@ func DeleteUser(id int64) error {
 	}
 	// Delete the templates
 	log.Infof("Deleting templates for user ID %d", id)
-	templates, err := GetTemplates(id)
+	templates := []Template{}
+	err = db.Where("user_id=?", id).Find(&templates).Error
 	if err != nil {
 		return err
 	}
@@ -134,7 +141,8 @@ func DeleteUser(id int64) error {
 	}
 	// Delete the groups
 	log.Infof("Deleting groups for user ID %d", id)
-	groups, err := GetGroups(id)
+	groups := []Group{}
+	err = db.Where("user_id=?", id).Find(&groups).Error
 	if err != nil {
 		return err
 	}
@@ -146,7 +154,8 @@ func DeleteUser(id int64) error {
 	}
 	// Delete the sending profiles
 	log.Infof("Deleting sending profiles for user ID %d", id)
-	profiles, err := GetSMTPs(id)
+	profiles := []SMTP{}
+	err = db.Where("user_id=?", id).Find(&profiles).Error
 	if err != nil {
 		return err
 	}

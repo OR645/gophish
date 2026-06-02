@@ -138,10 +138,15 @@ func (s *SMTP) GetDialer() (mailer.Dialer, error) {
 	return &Dialer{d}, err
 }
 
-// GetSMTPs returns the SMTPs owned by the given user.
+// GetSMTPs returns the SMTPs owned by the given user. Administrators receive
+// the sending profiles owned by every user.
 func GetSMTPs(uid int64) ([]SMTP, error) {
 	ss := []SMTP{}
-	err := db.Where("user_id=?", uid).Find(&ss).Error
+	query := db.Model(&SMTP{})
+	if !userIsAdmin(uid) {
+		query = query.Where("user_id=?", uid)
+	}
+	err := query.Find(&ss).Error
 	if err != nil {
 		log.Error(err)
 		return ss, err
@@ -157,9 +162,14 @@ func GetSMTPs(uid int64) ([]SMTP, error) {
 }
 
 // GetSMTP returns the SMTP, if it exists, specified by the given id and user_id.
+// Administrators may retrieve a sending profile owned by any user.
 func GetSMTP(id int64, uid int64) (SMTP, error) {
 	s := SMTP{}
-	err := db.Where("user_id=? and id=?", uid, id).Find(&s).Error
+	query := db.Where("id=?", id)
+	if !userIsAdmin(uid) {
+		query = query.Where("user_id=?", uid)
+	}
+	err := query.Find(&s).Error
 	if err != nil {
 		log.Error(err)
 		return s, err
