@@ -1,47 +1,53 @@
 {{define "nav"}}
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-sm-3 col-md-2 sidebar">
-            <ul class="nav nav-sidebar">
-                <li>
-                    <a href="/">Dashboard</a>
-                </li>
-                <li>
-                    <a href="/campaigns">Campaigns</a>
-                </li>
-                <li>
-                    <a href="/groups">Users &amp; Groups</a>
-                </li>
-                <li> <a href="/templates">Email Templates</a>
-                </li>
-                <li>
-                    <a href="/landing_pages">Landing Pages</a>
-                </li>
-                <li>
-                    <a href="/sending_profiles">Sending Profiles</a>
-                </li>
-                <li>
-                    <a href="/settings">Account Settings</span></a>
-                </li>
-                {{if .ModifySystem}}
-                <li>
-                    <a href="/users">User Management<span class="nav-badge badge pull-right">Admin</span></a>
-                </li>
-                <li>
-                    <a href="/webhooks">Webhooks<span class="nav-badge badge pull-right">Admin</span></a>
-                </li>
-                {{end}}
-                <li>
-                    <hr>
-                </li>
-                <li>
-                    <a href="https://docs.getgophish.com/user-guide/">User Guide</a>
-                </li>
-                <li>
-                    <a href="https://docs.getgophish.com/api-documentation/">API Documentation</a>
-                </li>
-            </ul>
-        </div>
+<aside class="sidebar">
+    <div class="brand">
+        <span class="brand-mark"><i class="fa fa-bullseye"></i></span>
+        <span class="brand-name"><b>Gophish</b><small>SOC Console</small></span>
     </div>
-</div>
+    <div class="nav-scroll">
+        <div class="nav-label">Operations</div>
+        <ul class="nav nav-sidebar">
+            <li><a href="/"><i class="fa fa-th-large"></i>Dashboard</a></li>
+            <li><a href="/campaigns"><i class="fa fa-bullseye"></i>Campaigns<span class="nav-badge" data-count="campaigns"></span></a></li>
+            <li><a href="/groups"><i class="fa fa-users"></i>Users &amp; Groups<span class="nav-badge" data-count="groups"></span></a></li>
+        </ul>
+        <div class="nav-label">Library</div>
+        <ul class="nav nav-sidebar">
+            <li><a href="/templates"><i class="fa fa-envelope-o"></i>Email Templates<span class="nav-badge" data-count="templates"></span></a></li>
+            <li><a href="/landing_pages"><i class="fa fa-file-o"></i>Landing Pages<span class="nav-badge" data-count="pages"></span></a></li>
+            <li><a href="/sending_profiles"><i class="fa fa-paper-plane-o"></i>Sending Profiles<span class="nav-badge" data-count="smtp"></span></a></li>
+        </ul>
+        <div class="nav-label">System</div>
+        <ul class="nav nav-sidebar">
+            <li><a href="/settings"><i class="fa fa-cog"></i>Account Settings</a></li>
+            {{if .ModifySystem}}
+            <li><a href="/users"><i class="fa fa-shield"></i>User Management</a></li>
+            <li><a href="/webhooks"><i class="fa fa-link"></i>Webhooks</a></li>
+            {{end}}
+        </ul>
+        <div class="nav-label">Help</div>
+        <ul class="nav nav-sidebar">
+            <li><a href="https://docs.getgophish.com/user-guide/" target="_blank"><i class="fa fa-book"></i>User Guide</a></li>
+            <li><a href="https://docs.getgophish.com/api-documentation/" target="_blank"><i class="fa fa-code"></i>API Documentation</a></li>
+        </ul>
+    </div>
+    <div class="sidebar-foot">
+        <div class="health">
+            <div class="health-top">
+                <span class="lbl">SYSTEM HEALTH</span>
+                <span class="pill pill-reported"><span class="dot"></span>OK</span>
+            </div>
+            <div class="bars">
+                <i></i><i></i><i></i><i></i><i></i><i></i><i class="warn"></i><i></i><i></i><i></i><i></i><i></i>
+            </div>
+        </div>
+        {{if .User}}
+        <a class="user-chip" href="/logout" title="Sign out">
+            <span class="avatar" id="userAvatar">{{.User.Username}}</span>
+            <span class="meta"><b>{{.User.Username}}</b><span>signed in</span></span>
+            <i class="fa fa-sign-out logout"></i>
+        </a>
+        {{end}}
+    </div>
+</aside>
 {{end}}

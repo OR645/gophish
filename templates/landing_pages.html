@@ -4,32 +4,20 @@
         Landing Pages
     </h1>
     <div id="flashes" class="row"></div>
-    <div class="row">
+    <div class="soc-between" style="margin-bottom:18px;">
+        <div class="soc-section-title" id="pageCount">Landing Pages</div>
         <button type="button" class="btn btn-primary" onclick="edit(-1)" data-toggle="modal" data-backdrop="static"
-            data-target="#modal"><i class="fa fa-plus"></i> New Page</button>
+            data-target="#modal"><i class="fa fa-plus"></i>&nbsp;New Page</button>
     </div>
-    &nbsp;
     <div id="loading">
         <i class="fa fa-spinner fa-spin fa-4x"></i>
     </div>
-    <div id="emptyMessage" class="row" style="display:none;">
+    <div id="emptyMessage" style="display:none;">
         <div class="alert alert-info">
             No pages created yet. Let's create one!
         </div>
     </div>
-    <div class="row">
-        <table id="pagesTable" class="table" style="display:none;">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Last Modified Date</th>
-                    <th class="col-md-2 no-sort"></th>
-                </tr>
-            </thead>
-            <tbody>
-            </tbody>
-        </table>
-    </div>
+    <div id="pagesGrid" class="card-grid fade-up" style="display:none;"></div>
 </div>
 <!-- Modal -->
 <div class="modal fade" id="modal" tabindex="-1" role="dialog" aria-labelledby="modalLabel">

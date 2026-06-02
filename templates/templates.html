@@ -6,32 +6,20 @@
         </h1>
     </div>
     <div id="flashes" class="row"></div>
-    <div class="row">
+    <div class="soc-between" style="margin-bottom:18px;">
+        <div class="soc-section-title" id="templateCount">Email Templates</div>
         <button type="button" class="btn btn-primary" onclick="edit(-1)" data-toggle="modal" data-backdrop="static"
-            data-target="#modal"><i class="fa fa-plus"></i> New Template</button>
+            data-target="#modal"><i class="fa fa-plus"></i>&nbsp;New Template</button>
     </div>
-    &nbsp;
     <div id="loading">
         <i class="fa fa-spinner fa-spin fa-4x"></i>
     </div>
-    <div id="emptyMessage" class="row" style="display:none;">
+    <div id="emptyMessage" style="display:none;">
         <div class="alert alert-info">
             No templates yet. Let's create one!
         </div>
     </div>
-    <div class="row">
-        <table id="templateTable" class="table" style="display:none;">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Modified Date</th>
-                    <th class="col-md-2 no-sort"></th>
-                </tr>
-            </thead>
-            <tbody>
-            </tbody>
-        </table>
-    </div>
+    <div id="templateGrid" class="card-grid fade-up" style="display:none;"></div>
 </div>
 <!-- Modal -->
 <div class="modal fade" id="modal" tabindex="-1" role="dialog" aria-labelledby="modalLabel">

@@ -1,6 +1,6 @@
 {{ define "base" }}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark" data-density="regular">
 
 <head>
     <meta charset="utf-8">
@@ -12,9 +12,19 @@
 
     <title>{{ .Title }} - Gophish</title>
 
+    <!-- Pre-paint theme init (avoids flash of wrong theme) -->
+    <script>
+        (function () {
+            try {
+                var t = localStorage.getItem("gophish-theme") || "dark";
+                document.documentElement.setAttribute("data-theme", t);
+            } catch (e) { }
+        })();
+    </script>
+
     <link href="/css/dist/gophish.css" rel="stylesheet" type="text/css">
-    <link href='https://fonts.googleapis.com/css?family=Roboto:700,500' rel='stylesheet' type='text/css'>
-    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,300,600,700' rel='stylesheet' type='text/css'>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" type="text/css">
+    <link href="/css/soc.css" rel="stylesheet" type="text/css">
     <script>
         {{if .User}}
     var user = {
@@ -29,43 +39,33 @@
 </head>
 
 <body>
-    <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
-        <div class="container-fluid">
-            <div class="navbar-header">
-                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
-                    <span class="sr-only">Toggle navigation</span>
-                    <span class="icon-bar"></span>
-                    <span class="icon-bar"></span>
-                    <span class="icon-bar"></span>
+    <div class="app">
+        {{template "nav" .}}
+        <div class="main">
+            <header class="topbar">
+                <div>
+                    <div class="page-title">{{ .Title }}</div>
+                    <div class="page-sub" id="topbarSub"></div>
+                </div>
+                <div class="search">
+                    <i class="fa fa-search"></i>
+                    <input id="topbarSearch" placeholder="Filter this page…" autocomplete="off" />
+                    <span class="kbd">/</span>
+                </div>
+                <button class="icon-btn" id="themeToggle" title="Toggle theme" type="button">
+                    <i class="fa fa-moon-o"></i>
                 </button>
-                <img class="navbar-logo" src="/images/logo_inv_small.png" />
-                <a class="navbar-brand" href="/">&nbsp;gophish</a>
-            </div>
-            <div class="navbar-collapse collapse">
-                <ul class="nav navbar-nav navbar-right">
-                    <li>
-                        {{if .User}}
-                        <div class="btn-group" id="navbar-dropdown">
-                            <a class="btn btn-primary" href="/settings"><i class="fa fa-user"></i> {{.User.Username}}</a>
-                            <a class="btn btn-primary dropdown-toggle" href="/logout">
-                                <i class="fa fa-sign-out"></i>
-                            </a>
-                        </div>
-                        {{else}}
-                        <a href="/login">
-                            <button type="button" class="btn btn-primary">Login</button>
-                        </a>
-                        {{end}}
-                    </li>
-                </ul>
+                <a class="btn btn-primary" href="/campaigns"><i class="fa fa-plus"></i>&nbsp;New Campaign</a>
+            </header>
+            <div class="canvas">
+                {{template "body" .}}
             </div>
         </div>
     </div>
-    {{template "nav" .}}
-    {{template "body" .}}
     <!-- Placed at the end of the document so the pages load faster -->
     <script src="/js/dist/vendor.min.js"></script>
     <script src="/js/dist/app/gophish.min.js"></script>
+    <script src="/js/dist/app/soc.min.js"></script>
     {{template "scripts" .}}
 </body>
 

@@ -149,47 +149,66 @@ function copy(idx) {
     $("#html_editor").val(page.html)
 }
 
+// renderCard builds a single landing-page card with a live HTML preview.
+function renderCard(page, i) {
+    var modified = moment(page.modified_date).format('MMM Do YYYY, h:mm a')
+    var flags = ""
+    if (page.capture_credentials) {
+        flags += "<span class='tag' style='color:var(--c-clicked)'><i class='fa fa-mouse-pointer'></i>&nbsp;Capture data</span>"
+    }
+    if (page.capture_passwords) {
+        flags += "<span class='tag' style='color:var(--c-submitted)'><i class='fa fa-lock'></i>&nbsp;Capture creds</span>"
+    }
+    if (page.redirect_url) {
+        flags += "<span class='tag'><i class='fa fa-external-link'></i>&nbsp;Redirect</span>"
+    }
+    var card = $(
+        "<div class='tcard' data-name='" + escapeHtml(page.name) + "'>" +
+        "  <div class='thumb'>" +
+        "    <div class='previewbar'><span class='d'></span><span class='d'></span><span class='d'></span><span class='u'>landing page</span></div>" +
+        "    <div class='frame-wrap'></div>" +
+        "    <div class='overlay'><span class='pill pill-active open-pill'><i class='fa fa-eye'></i>&nbsp;Preview</span></div>" +
+        "  </div>" +
+        "  <div class='tmeta'>" +
+        "    <div class='tname'><b>" + escapeHtml(page.name) + "</b><span>" + modified + "</span></div>" +
+        "    <div class='tactions'>" +
+        "      <button class='icon-btn' title='Edit' data-toggle='modal' data-backdrop='static' data-target='#modal' onclick='edit(" + i + ")'><i class='fa fa-pencil'></i></button>" +
+        "      <button class='icon-btn' title='Copy' data-toggle='modal' data-backdrop='static' data-target='#modal' onclick='copy(" + i + ")'><i class='fa fa-copy'></i></button>" +
+        "      <button class='icon-btn' title='Delete' onclick='deletePage(" + i + ")'><i class='fa fa-trash-o'></i></button>" +
+        "    </div>" +
+        "  </div>" +
+        (flags ? "  <div class='tflags'>" + flags + "</div>" : "") +
+        "</div>"
+    )
+    if (page.html) {
+        var frame = $("<iframe sandbox='' title='preview' scrolling='no'></iframe>")
+        card.find(".frame-wrap").append(frame)
+        frame[0].srcdoc = page.html
+    } else {
+        card.find(".frame-wrap").replaceWith("<div class='empty'>[ no HTML content ]</div>")
+    }
+    card.find(".overlay").attr({ "data-toggle": "modal", "data-backdrop": "static", "data-target": "#previewModal" })
+        .on("click", function () { preview(i) })
+    return card
+}
+
 function load() {
     /*
         load() - Loads the current pages using the API
     */
-    $("#pagesTable").hide()
+    $("#pagesGrid").hide().empty()
     $("#emptyMessage").hide()
     $("#loading").show()
     api.pages.get()
         .success(function (ps) {
             pages = ps
             $("#loading").hide()
+            $("#pageCount").text("Landing Pages · " + pages.length)
             if (pages.length > 0) {
-                $("#pagesTable").show()
-                pagesTable = $("#pagesTable").DataTable({
-                    destroy: true,
-                    columnDefs: [{
-                        orderable: false,
-                        targets: "no-sort"
-                    }]
-                });
-                pagesTable.clear()
-                pageRows = []
+                var grid = $("#pagesGrid").show()
                 $.each(pages, function (i, page) {
-                    pageRows.push([
-                        escapeHtml(page.name),
-                        moment(page.modified_date).format('MMMM Do YYYY, h:mm:ss a'),
-                        "<div class='pull-right'><span data-toggle='modal' data-backdrop='static' data-target='#previewModal'><button class='btn btn-primary' data-toggle='tooltip' data-placement='left' title='Preview Page' onclick='preview(" + i + ")'>\
-                    <i class='fa fa-eye'></i>\
-                    </button></span>\
-                    <span data-toggle='modal' data-backdrop='static' data-target='#modal'><button class='btn btn-primary' data-toggle='tooltip' data-placement='left' title='Edit Page' onclick='edit(" + i + ")'>\
-                    <i class='fa fa-pencil'></i>\
-                    </button></span>\
-		    <span data-toggle='modal' data-target='#modal'><button class='btn btn-primary' data-toggle='tooltip' data-placement='left' title='Copy Page' onclick='copy(" + i + ")'>\
-                    <i class='fa fa-copy'></i>\
-                    </button></span>\
-                    <button class='btn btn-danger' data-toggle='tooltip' data-placement='left' title='Delete Page' onclick='deletePage(" + i + ")'>\
-                    <i class='fa fa-trash-o'></i>\
-                    </button></div>"
-                    ])
+                    grid.append(renderCard(page, i))
                 })
-                pagesTable.rows.add(pageRows).draw()
                 $('[data-toggle="tooltip"]').tooltip()
             } else {
                 $("#emptyMessage").show()

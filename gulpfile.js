@@ -61,6 +61,7 @@ scripts = function () {
             app_directory + 'settings.js',
             app_directory + 'templates.js',
             app_directory + 'gophish.js',
+            app_directory + 'soc.js',
             app_directory + 'users.js',
             app_directory + 'webhooks.js',
             app_directory + 'passwords.js'
