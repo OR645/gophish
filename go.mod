@@ -1,6 +1,6 @@
 module github.com/gophish/gophish
 
-go 1.13
+go 1.24.0
 
 require (
 	bitbucket.org/liamstask/goose v0.0.0-20150115234039-8488cc47d90c
