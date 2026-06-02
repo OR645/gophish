@@ -1,14 +1,17 @@
 {{define "body"}}
 <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
-  <div class="canvas-inner fade-up">
+  <div class="canvas-inner stack fade-up">
     <div id="flashes"></div>
-    <div class="soc-between" style="margin-bottom:18px;">
-        <div class="soc-section-title">Campaigns</div>
-        <button type="button" class="btn btn-primary" data-toggle="modal" data-backdrop="static" data-target="#modal"
-            onclick="edit('new')">
-            <i class="fa fa-plus"></i>&nbsp;New Campaign</button>
-    </div>
+    <div class="soc-grid-3" id="campaignKpis"></div>
     <div class="panel table-panel">
+        <div class="panel-head">
+            <div><h3>All Campaigns</h3><div class="sub">manage &amp; launch simulations</div></div>
+            <div class="head-actions">
+                <button type="button" class="btn btn-sm btn-primary" data-toggle="modal" data-backdrop="static"
+                    data-target="#modal" onclick="edit('new')">
+                    <i class="fa fa-plus"></i>&nbsp;New Campaign</button>
+            </div>
+        </div>
         <ul class="nav nav-tabs" role="tablist">
             <li class="active" role="activeCampaigns"><a href="#activeCampaigns" aria-controls="activeCampaigns" role="tab"
                     data-toggle="tab">Active Campaigns</a></li>
@@ -28,10 +31,13 @@
                 <table id="campaignTable" class="table" style="display:none;">
                     <thead>
                         <tr>
-                            <th class="col-md-3">Name</th>
-                            <th class="col-md-4">Created Date</th>
-                            <th class="col-md-2">Status</th>
-                            <th class="col-md-3 no-sort"></th>
+                            <th>Campaign</th>
+                            <th>Status</th>
+                            <th>Launched</th>
+                            <th>Sent</th>
+                            <th class="no-sort">Funnel</th>
+                            <th>Click Rate</th>
+                            <th class="no-sort"></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -39,7 +45,7 @@
                 </table>
             </div>
             <div role="tabpanel" class="tab-pane" id="archivedCampaigns">
-                <div id="emptyMessage" style="display:none;">
+                <div id="emptyMessageArchive" style="display:none;">
                     <div class="alert alert-info">
                         No archived campaigns.
                     </div>
@@ -47,10 +53,13 @@
                 <table id="campaignTableArchive" class="table" style="display:none;">
                     <thead>
                         <tr>
-                            <th class="col-md-3">Name</th>
-                            <th class="col-md-4">Created Date</th>
-                            <th class="col-md-2">Status</th>
-                            <th class="col-md-3 no-sort"></th>
+                            <th>Campaign</th>
+                            <th>Status</th>
+                            <th>Launched</th>
+                            <th>Sent</th>
+                            <th class="no-sort">Funnel</th>
+                            <th>Click Rate</th>
+                            <th class="no-sort"></th>
                         </tr>
                     </thead>
                     <tbody>

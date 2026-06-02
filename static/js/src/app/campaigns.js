@@ -11,6 +11,78 @@ var labels = {
 var campaigns = []
 var campaign = {}
 
+// ---- SOC-redesign list helpers --------------------------------------------
+// Status -> pill style (matches the prototype StatusPill).
+function campaignStatusPill(status, quickStats) {
+    var cls = status === "Completed" ? "pill-done" : status === "Error" ? "pill-submitted" : "pill-active"
+    return '<span class="pill ' + cls + '" data-toggle="tooltip" data-placement="right" data-html="true" title="' +
+        quickStats + '"><span class="dot"></span>' + escapeHtml(status) + '</span>'
+}
+
+// Inline mini funnel bar [sent, opened, clicked, submitted, reported].
+function campaignMiniFunnel(f) {
+    var total = f.reduce(function (a, b) { return a + b }, 0) || 1
+    var colors = ["var(--c-sent)", "var(--c-opened)", "var(--c-clicked)", "var(--c-submitted)", "var(--c-reported)"]
+    return '<div class="minifunnel" title="' + f.join(" / ") + '">' + f.map(function (v, i) {
+        return '<span style="width:' + (v / total * 100) + '%;background:' + colors[i] + '"></span>'
+    }).join("") + '</div>'
+}
+
+// Build a full <tr> for the campaign list (DOM-sourced DataTable; data-order
+// attributes drive correct sorting on each column).
+function campaignRowHtml(campaign, idx) {
+    var s = campaign.stats || {}
+    var rate = s.sent ? Math.round((s.clicked / s.sent) * 1000) / 10 : 0
+    var f = [s.sent || 0, s.opened || 0, s.clicked || 0, s.submitted_data || 0, s.email_reported || 0]
+    var epoch = new Date(campaign.created_date).getTime() || 0
+    var date = moment(campaign.created_date).format('MMM Do YYYY, h:mm a')
+    var launchDate, quickStats
+    if (moment(campaign.launch_date).isAfter(moment())) {
+        launchDate = "Scheduled to start: " + moment(campaign.launch_date).format('MMMM Do YYYY, h:mm:ss a')
+        quickStats = launchDate + "<br><br>Number of recipients: " + s.total
+    } else {
+        launchDate = "Launch Date: " + moment(campaign.launch_date).format('MMMM Do YYYY, h:mm:ss a')
+        quickStats = launchDate + "<br><br>Number of recipients: " + s.total + "<br><br>Emails opened: " + s.opened +
+            "<br><br>Emails clicked: " + s.clicked + "<br><br>Submitted Credentials: " + s.submitted_data +
+            "<br><br>Errors : " + s.error + "<br><br>Reported : " + s.email_reported
+    }
+    return '<tr>' +
+        '<td class="strong"><a href="/campaigns/' + campaign.id + '" style="color:inherit;text-decoration:none;">' + escapeHtml(campaign.name) + '</a>' +
+        '<div class="mono" style="font-size:10.5px;color:var(--ink-faint);font-weight:400;">CMP-' + campaign.id + '</div></td>' +
+        '<td data-order="' + escapeHtml(campaign.status) + '">' + campaignStatusPill(campaign.status, quickStats) + '</td>' +
+        '<td class="num" data-order="' + epoch + '">' + date + '</td>' +
+        '<td class="num strong" data-order="' + (s.sent || 0) + '">' + (s.sent || 0) + '</td>' +
+        '<td>' + campaignMiniFunnel(f) + '</td>' +
+        '<td class="num strong" data-order="' + rate + '">' + rate + '%</td>' +
+        '<td class="no-sort"><div style="display:flex;gap:6px;justify-content:flex-end;">' +
+        '<a class="icon-btn" style="width:30px;height:30px;" href="/campaigns/' + campaign.id + '" data-toggle="tooltip" data-placement="top" title="View Results"><i class="fa fa-bar-chart"></i></a>' +
+        '<span data-toggle="modal" data-backdrop="static" data-target="#modal"><button class="icon-btn" style="width:30px;height:30px;" data-toggle="tooltip" data-placement="top" title="Copy Campaign" onclick="copy(' + idx + ')"><i class="fa fa-copy"></i></button></span>' +
+        '<button class="icon-btn" style="width:30px;height:30px;color:var(--c-submitted);" data-toggle="tooltip" data-placement="top" title="Delete Campaign" onclick="deleteCampaign(' + idx + ')"><i class="fa fa-trash-o"></i></button>' +
+        '</div></td>' +
+        '</tr>'
+}
+
+// KPI row above the table (real aggregates).
+function renderCampaignKpis(cs) {
+    var running = 0, sent = 0, clicked = 0
+    $.each(cs, function (i, c) {
+        var s = c.stats || {}
+        sent += s.sent || 0
+        clicked += s.clicked || 0
+        if (c.status && c.status !== "Completed") running++
+    })
+    var rate = sent ? Math.round((clicked / sent) * 1000) / 10 : 0
+    var kpis = [
+        { label: "Total Campaigns", icon: "fa-bullseye", value: cs.length },
+        { label: "Running Now", icon: "fa-bolt", value: running, accent: true },
+        { label: "Avg Click Rate", icon: "fa-mouse-pointer", value: rate, suffix: "%" }
+    ]
+    document.getElementById("campaignKpis").innerHTML = kpis.map(function (k) {
+        return '<div class="kpi"><div class="label"><span class="ic"><i class="fa ' + k.icon + '"></i></span>' + k.label + '</div>' +
+            '<div class="value"' + (k.accent ? ' style="color:var(--accent)"' : '') + '>' + k.value + (k.suffix ? '<small>' + k.suffix + '</small>' : '') + '</div></div>'
+    }).join("")
+}
+
 // Launch attempts to POST to /campaigns/
 function launch() {
     Swal.fire({
@@ -343,66 +415,29 @@ $(document).ready(function () {
             campaigns = data.campaigns
             $("#loading").hide()
             if (campaigns.length > 0) {
-                $("#campaignTable").show()
-                $("#campaignTableArchive").show()
-
-                activeCampaignsTable = $("#campaignTable").DataTable({
-                    columnDefs: [{
-                        orderable: false,
-                        targets: "no-sort"
-                    }],
-                    order: [
-                        [1, "desc"]
-                    ]
-                });
-                archivedCampaignsTable = $("#campaignTableArchive").DataTable({
-                    columnDefs: [{
-                        orderable: false,
-                        targets: "no-sort"
-                    }],
-                    order: [
-                        [1, "desc"]
-                    ]
-                });
-                rows = {
-                    'active': [],
-                    'archived': []
-                }
+                renderCampaignKpis(campaigns)
+                var activeRows = [], archivedRows = []
                 $.each(campaigns, function (i, campaign) {
-                    label = labels[campaign.status] || "label-default";
-
-                    //section for tooltips on the status of a campaign to show some quick stats
-                    var launchDate;
-                    if (moment(campaign.launch_date).isAfter(moment())) {
-                        launchDate = "Scheduled to start: " + moment(campaign.launch_date).format('MMMM Do YYYY, h:mm:ss a')
-                        var quickStats = launchDate + "<br><br>" + "Number of recipients: " + campaign.stats.total
-                    } else {
-                        launchDate = "Launch Date: " + moment(campaign.launch_date).format('MMMM Do YYYY, h:mm:ss a')
-                        var quickStats = launchDate + "<br><br>" + "Number of recipients: " + campaign.stats.total + "<br><br>" + "Emails opened: " + campaign.stats.opened + "<br><br>" + "Emails clicked: " + campaign.stats.clicked + "<br><br>" + "Submitted Credentials: " + campaign.stats.submitted_data + "<br><br>" + "Errors : " + campaign.stats.error + "<br><br>" + "Reported : " + campaign.stats.email_reported
-                    }
-
-                    var row = [
-                        escapeHtml(campaign.name),
-                        moment(campaign.created_date).format('MMMM Do YYYY, h:mm:ss a'),
-                        "<span class=\"label " + label + "\" data-toggle=\"tooltip\" data-placement=\"right\" data-html=\"true\" title=\"" + quickStats + "\">" + campaign.status + "</span>",
-                        "<div class='pull-right'><a class='btn btn-primary' href='/campaigns/" + campaign.id + "' data-toggle='tooltip' data-placement='left' title='View Results'>\
-                    <i class='fa fa-bar-chart'></i>\
-                    </a>\
-            <span data-toggle='modal' data-backdrop='static' data-target='#modal'><button class='btn btn-primary' data-toggle='tooltip' data-placement='left' title='Copy Campaign' onclick='copy(" + i + ")'>\
-                    <i class='fa fa-copy'></i>\
-                    </button></span>\
-                    <button class='btn btn-danger' onclick='deleteCampaign(" + i + ")' data-toggle='tooltip' data-placement='left' title='Delete Campaign'>\
-                    <i class='fa fa-trash-o'></i>\
-                    </button></div>"
-                    ]
+                    var html = campaignRowHtml(campaign, i)
                     if (campaign.status == 'Completed') {
-                        rows['archived'].push(row)
+                        archivedRows.push(html)
                     } else {
-                        rows['active'].push(row)
+                        activeRows.push(html)
                     }
                 })
-                activeCampaignsTable.rows.add(rows['active']).draw()
-                archivedCampaignsTable.rows.add(rows['archived']).draw()
+                // Source the DataTables from the DOM so per-cell data-order
+                // attributes drive correct numeric / date sorting.
+                $("#campaignTable tbody").html(activeRows.join(""))
+                $("#campaignTableArchive tbody").html(archivedRows.join(""))
+                $("#campaignTable").show()
+                $("#campaignTableArchive").show()
+                var dtOpts = {
+                    columnDefs: [{ orderable: false, targets: "no-sort" }],
+                    order: [[2, "desc"]]
+                }
+                activeCampaignsTable = $("#campaignTable").DataTable(dtOpts)
+                archivedCampaignsTable = $("#campaignTableArchive").DataTable(dtOpts)
+                if (!archivedRows.length) { $("#emptyMessageArchive").show() }
                 $('[data-toggle="tooltip"]').tooltip()
             } else {
                 $("#emptyMessage").show()
