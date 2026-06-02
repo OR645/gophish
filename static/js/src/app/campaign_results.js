@@ -461,133 +461,178 @@ function renderTimeline(data) {
     return results
 }
 
-var renderTimelineChart = function (chartopts) {
-    return Highcharts.chart('timeline_chart', {
-        chart: {
-            zoomType: 'x',
-            type: 'line',
-            height: "200px"
-        },
-        title: {
-            text: 'Campaign Timeline'
-        },
-        xAxis: {
-            type: 'datetime',
-            dateTimeLabelFormats: {
-                second: '%l:%M:%S',
-                minute: '%l:%M',
-                hour: '%l:%M',
-                day: '%b %d, %Y',
-                week: '%b %d, %Y',
-                month: '%b %Y'
-            }
-        },
-        yAxis: {
-            min: 0,
-            max: 2,
-            visible: false,
-            tickInterval: 1,
-            labels: {
-                enabled: false
-            },
-            title: {
-                text: ""
-            }
-        },
-        tooltip: {
-            formatter: function () {
-                return Highcharts.dateFormat('%A, %b %d %l:%M:%S %P', new Date(this.x)) +
-                    '<br>Event: ' + this.point.message + '<br>Email: <b>' + this.point.email + '</b>'
-            }
-        },
-        legend: {
-            enabled: false
-        },
-        plotOptions: {
-            series: {
-                marker: {
-                    enabled: true,
-                    symbol: 'circle',
-                    radius: 3
-                },
-                cursor: 'pointer',
-            },
-            line: {
-                states: {
-                    hover: {
-                        lineWidth: 1
-                    }
-                }
-            }
-        },
-        credits: {
-            enabled: false
-        },
-        series: [{
-            data: chartopts['data'],
-            dashStyle: "shortdash",
-            color: "#cccccc",
-            lineWidth: 1,
-            turboThreshold: 0
-        }]
+/* computeFunnel tallies the conversion funnel counts from the campaign
+ * results. Each result is "backfilled" so that, e.g., a recipient who clicked
+ * is also counted as having opened and been sent (matching gophish's progress
+ * model). Reported is tracked independently via the result's reported flag.
+ *
+ * @param {object} c - a campaign results object
+ * @returns {object} counts keyed by sent/opened/clicked/submitted/reported
+ */
+function computeFunnel(c) {
+    var counts = { sent: 0, opened: 0, clicked: 0, submitted: 0, reported: 0 }
+    var order = ["Email Sent", "Email Opened", "Clicked Link", "Submitted Data"]
+    var keymap = {
+        "Email Sent": "sent",
+        "Email Opened": "opened",
+        "Clicked Link": "clicked",
+        "Submitted Data": "submitted"
+    }
+    $.each(c.results || [], function (i, r) {
+        if (r.reported) {
+            counts.reported++
+        }
+        var step = order.indexOf(r.status)
+        if (step < 0) {
+            return true
+        }
+        for (var k = 0; k <= step; k++) {
+            counts[keymap[order[k]]]++
+        }
     })
+    return counts
 }
 
-/* Renders a pie chart using the provided chartops */
-var renderPieChart = function (chartopts) {
-    return Highcharts.chart(chartopts['elemId'], {
-        chart: {
-            type: 'pie',
-            events: {
-                load: function () {
-                    var chart = this,
-                        rend = chart.renderer,
-                        pie = chart.series[0],
-                        left = chart.plotLeft + pie.center[0],
-                        top = chart.plotTop + pie.center[1];
-                    this.innerText = rend.text(chartopts['data'][0].count, left, top).
-                    attr({
-                        'text-anchor': 'middle',
-                        'font-size': '24px',
-                        'font-weight': 'bold',
-                        'fill': chartopts['colors'][0],
-                        'font-family': 'Helvetica,Arial,sans-serif'
-                    }).add();
-                },
-                render: function () {
-                    this.innerText.attr({
-                        text: chartopts['data'][0].count
-                    })
-                }
-            }
-        },
-        title: {
-            text: chartopts['title']
-        },
-        plotOptions: {
-            pie: {
-                innerSize: '80%',
-                dataLabels: {
-                    enabled: false
-                }
-            }
-        },
-        credits: {
-            enabled: false
-        },
-        tooltip: {
-            formatter: function () {
-                if (this.key == undefined) {
-                    return false
-                }
-                return '<span style="color:' + this.color + '">\u25CF</span>' + this.point.name + ': <b>' + this.y + '%</b><br/>'
-            }
-        },
-        series: [{
-            data: chartopts['data'],
-            colors: chartopts['colors'],
-        }]
+/* buildDonut returns the HTML for an SVG ring chart with a centered label.
+ *
+ * @param {object[]} segments - [{value, color}] drawn clockwise
+ * @param {string} centerTop - large centered text (e.g. "14.8%")
+ * @param {string} centerSub - small caption under it (e.g. "COMPROMISED")
+ */
+function buildDonut(segments, centerTop, centerSub) {
+    var size = 158, stroke = 17
+    var r = (size - stroke) / 2
+    var circ = 2 * Math.PI * r
+    var total = segments.reduce(function (a, s) { return a + s.value }, 0) || 1
+    var off = 0
+    var arcs = ''
+    $.each(segments, function (i, s) {
+        var len = (s.value / total) * circ
+        arcs += '<circle cx="' + (size / 2) + '" cy="' + (size / 2) + '" r="' + r + '"' +
+            ' fill="none" stroke="' + s.color + '" stroke-width="' + stroke + '"' +
+            ' stroke-dasharray="' + len + ' ' + (circ - len) + '"' +
+            ' stroke-dashoffset="' + (-off) + '"></circle>'
+        off += len
     })
+    return '<div style="position:relative;width:' + size + 'px;height:' + size + 'px;">' +
+        '<svg width="' + size + '" height="' + size + '" style="transform:rotate(-90deg)">' +
+        '<circle cx="' + (size / 2) + '" cy="' + (size / 2) + '" r="' + r + '" fill="none"' +
+        ' stroke="var(--panel-2)" stroke-width="' + stroke + '"></circle>' + arcs + '</svg>' +
+        '<div style="position:absolute;inset:0;display:grid;place-items:center;text-align:center;">' +
+        '<div><div class="num" style="font-size:30px;font-weight:600;letter-spacing:-1px;">' + centerTop + '</div>' +
+        '<div class="mono" style="font-size:10.5px;color:var(--ink-dim);letter-spacing:0.5px;margin-top:2px;">' + centerSub + '</div>' +
+        '</div></div></div>'
+}
+
+/* renderHeader fills in the campaign title, meta line and status pill.
+ * The /results endpoint only returns id/name/status/results/timeline, so the
+ * launch time is read from the "Campaign Created" event in the timeline. */
+function renderHeader(c) {
+    $("#page-title").text(c.name || "Results")
+    var meta = []
+    if (c.id) {
+        meta.push("Campaign #" + c.id)
+    }
+    var created = null
+    $.each(c.timeline || [], function (i, e) {
+        if (e.message == "Campaign Created") {
+            created = e.time
+            return false
+        }
+    })
+    if (created) {
+        meta.push("launched " + moment.utc(created).local().format('YYYY-MM-DD HH:mm'))
+    }
+    $("#campaignMeta").text(meta.join("  \u00B7  "))
+
+    var s = c.status || "Active"
+    var pillClass = "pill-active"
+    if (s == "Completed") {
+        pillClass = "pill-done"
+    }
+    $("#campaignStatus").html('<span class="pill ' + pillClass + '"><span class="dot"></span>' + escapeHtml(s) + '</span>')
+}
+
+/* renderResultsCharts draws the conversion funnel and the outcome donut from
+ * the live campaign data. Called on initial load and on every poll. */
+function renderResultsCharts(c) {
+    var recipients = (c.results || []).length
+    var f = computeFunnel(c)
+
+    /* ---- Conversion funnel ---- */
+    var rows = [
+        { label: "Email Sent", value: f.sent, color: "var(--c-sent)" },
+        { label: "Email Opened", value: f.opened, color: "var(--c-opened)" },
+        { label: "Clicked Link", value: f.clicked, color: "var(--c-clicked)" },
+        { label: "Submitted Data", value: f.submitted, color: "var(--c-submitted)" },
+        { label: "Reported", value: f.reported, color: "var(--c-reported)" }
+    ]
+    var base = rows[0].value || recipients || 1
+    var funnelHtml = '<div class="funnel">'
+    $.each(rows, function (i, d) {
+        var pct = (d.value / base) * 100
+        var ofPrev = i ? (d.value / (rows[i - 1].value || 1)) * 100 : 100
+        funnelHtml += '<div class="funnel-row">' +
+            '<div class="fl"><span class="sw" style="background:' + d.color + '"></span>' + d.label + '</div>' +
+            '<div class="funnel-track"><div class="funnel-fill" style="width:' + Math.max(pct, 7).toFixed(0) + '%;background:' + d.color + '">' + pct.toFixed(0) + '%</div></div>' +
+            '<div class="fv"><b class="num">' + d.value.toLocaleString() + '</b> <span class="num">' + (i ? ofPrev.toFixed(0) + '%' : '\u2014') + '</span></div>' +
+            '</div>'
+    })
+    funnelHtml += '</div>'
+    $("#resultsFunnel").html(funnelHtml)
+    $("#funnelSub").text(recipients.toLocaleString() + " recipients")
+
+    /* ---- Outcome donut ---- */
+    var submitted = f.submitted
+    var clickedOnly = Math.max(f.clicked - f.submitted, 0)
+    var openedOnly = Math.max(f.opened - f.clicked, 0)
+    var notOpened = Math.max(f.sent - f.opened, 0)
+    var compromised = recipients ? (submitted / recipients) * 100 : 0
+    $("#outcomeChart").html(buildDonut([
+        { value: submitted, color: "var(--c-submitted)" },
+        { value: clickedOnly, color: "var(--c-clicked)" },
+        { value: openedOnly, color: "var(--c-opened)" },
+        { value: notOpened, color: "var(--c-sent)" }
+    ], compromised.toFixed(1) + "%", "COMPROMISED"))
+
+    var legend = [
+        ["Submitted", submitted, "var(--c-submitted)"],
+        ["Clicked only", clickedOnly, "var(--c-clicked)"],
+        ["Opened only", openedOnly, "var(--c-opened)"],
+        ["Reported", f.reported, "var(--c-reported)"]
+    ]
+    var legendHtml = ''
+    $.each(legend, function (i, row) {
+        legendHtml += '<div class="soc-between">' +
+            '<span style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-mid);">' +
+            '<span style="width:9px;height:9px;border-radius:3px;background:' + row[2] + ';"></span>' + row[0] + '</span>' +
+            '<span class="num" style="font-weight:600;">' + row[1].toLocaleString() + '</span>' +
+            '</div>'
+    })
+    $("#outcomeLegend").html(legendHtml)
+}
+
+/* renderGeo fills the "Top Sources" list and the map footer from the bubbles
+ * (one per origin IP, with an event count) built in updateMap. */
+function renderGeo() {
+    var sorted = bubbles.slice().sort(function (a, b) { return b.count - a.count }).slice(0, 6)
+    var max = sorted.length ? sorted[0].count : 1
+    var html = ''
+    $.each(sorted, function (i, b) {
+        html += '<div class="gi"><span class="gn">' + escapeHtml(b.ip) + '</span>' +
+            '<span class="gbar"><i style="width:' + ((b.count / max) * 100) + '%"></i></span>' +
+            '<span class="gv">' + b.count + '</span></div>'
+    })
+    if (!html) {
+        html = '<div class="mono" style="color:var(--ink-faint);font-size:12px;">No geolocated events yet</div>'
+    }
+    $("#geoList").html(html)
+
+    var totalEvents = 0
+    $.each(bubbles, function (i, b) { totalEvents += b.count })
+    $("#geoFooter").text(
+        totalEvents.toLocaleString() + " geolocated event" + (totalEvents == 1 ? "" : "s") +
+        " \u00B7 " + bubbles.length + " source" + (bubbles.length == 1 ? "" : "s"))
 }
 
 /* Updates the bubbles on the map
@@ -595,9 +640,6 @@ var renderPieChart = function (chartopts) {
 @param {campaign.result[]} results - The campaign results to process
 */
 var updateMap = function (results) {
-    if (!map) {
-        return
-    }
     bubbles = []
     $.each(campaign.results, function (i, result) {
         // Check that it wasn't an internal IP
@@ -627,14 +669,19 @@ var updateMap = function (results) {
     })
     // Mark each origin on the map and show the IP address (and how many
     // recipients connected from it) when hovering the bubble.
-    map.bubbles(bubbles, {
-        popupTemplate: function (geo, data) {
-            return '<div class="hoverinfo">' +
-                '<strong>IP Address:</strong> ' + escapeHtml(data.name) +
-                '<br><strong>Events:</strong> ' + escapeHtml(String(data.count)) +
-                '</div>'
-        }
-    })
+    if (map) {
+        map.bubbles(bubbles, {
+            popupTemplate: function (geo, data) {
+                return '<div class="hoverinfo">' +
+                    '<strong>IP Address:</strong> ' + escapeHtml(data.name) +
+                    '<br><strong>Events:</strong> ' + escapeHtml(String(data.count)) +
+                    '</div>'
+            }
+        })
+    }
+    // The "Top Sources" list and footer work from the same data, so they
+    // render even when the visual map is disabled.
+    renderGeo()
 }
 
 /**
@@ -656,69 +703,18 @@ function createStatusLabel(status, send_date) {
 /* poll - Queries the API and updates the UI with the results
  *
  * Updates:
- * * Timeline Chart
- * * Email (Donut) Chart
- * * Map Bubbles
- * * Datatables
+ * * Header (title / meta / status)
+ * * Conversion Funnel + Outcome donut
+ * * Map bubbles + Top Sources list
+ * * Datatable
  */
 function poll() {
     api.campaignId.results(campaign.id)
         .success(function (c) {
             campaign = c
-            /* Update the timeline */
-            var timeline_series_data = []
-            $.each(campaign.timeline, function (i, event) {
-                var event_date = moment.utc(event.time).local()
-                timeline_series_data.push({
-                    email: event.email,
-                    message: event.message,
-                    x: event_date.valueOf(),
-                    y: 1,
-                    marker: {
-                        fillColor: statuses[event.message].color
-                    }
-                })
-            })
-            var timeline_chart = $("#timeline_chart").highcharts()
-            timeline_chart.series[0].update({
-                data: timeline_series_data
-            })
-            /* Update the results donut chart */
-            var email_series_data = {}
-            // Load the initial data
-            Object.keys(statusMapping).forEach(function (k) {
-                email_series_data[k] = 0
-            });
-            $.each(campaign.results, function (i, result) {
-                email_series_data[result.status]++;
-                if (result.reported) {
-                    email_series_data['Email Reported']++
-                }
-                // Backfill status values
-                var step = progressListing.indexOf(result.status)
-                for (var i = 0; i < step; i++) {
-                    email_series_data[progressListing[i]]++
-                }
-            })
-            $.each(email_series_data, function (status, count) {
-                var email_data = []
-                if (!(status in statusMapping)) {
-                    return true
-                }
-                email_data.push({
-                    name: status,
-                    y: Math.floor((count / campaign.results.length) * 100),
-                    count: count
-                })
-                email_data.push({
-                    name: '',
-                    y: 100 - Math.floor((count / campaign.results.length) * 100)
-                })
-                var chart = $("#" + statusMapping[status] + "_chart").highcharts()
-                chart.series[0].update({
-                    data: email_data
-                })
-            })
+            /* Refresh the header, conversion funnel and outcome donut */
+            renderHeader(campaign)
+            renderResultsCharts(campaign)
 
             /* Update the datatable */
             resultsTable = $("#resultsTable").DataTable()
@@ -752,7 +748,6 @@ function poll() {
 
 function load() {
     campaign.id = window.location.pathname.split('/').slice(-1)[0]
-    var use_map = JSON.parse(localStorage.getItem('gophish.use_map'))
     api.campaignId.results(campaign.id)
         .success(function (c) {
             campaign = c
@@ -760,8 +755,8 @@ function load() {
                 $("title").text(c.name + " - Gophish")
                 $("#loading").hide()
                 $("#campaignResults").show()
-                // Set the title
-                $("#page-title").text("Results for " + c.name)
+                // Set the title, meta line and status pill
+                renderHeader(c)
                 if (c.status == "Completed") {
                     $('#complete_button')[0].disabled = true;
                     $('#complete_button').text('Completed!');
@@ -819,11 +814,6 @@ function load() {
                     ]
                 });
                 resultsTable.clear();
-                var email_series_data = {}
-                var timeline_series_data = []
-                Object.keys(statusMapping).forEach(function (k) {
-                    email_series_data[k] = 0
-                });
                 $.each(campaign.results, function (i, result) {
                     resultsTable.row.add([
                         result.id,
@@ -836,15 +826,6 @@ function load() {
                         result.reported,
                         moment(result.send_date).format('MMMM Do YYYY, h:mm:ss a')
                     ])
-                    email_series_data[result.status]++;
-                    if (result.reported) {
-                        email_series_data['Email Reported']++
-                    }
-                    // Backfill status values
-                    var step = progressListing.indexOf(result.status)
-                    for (var i = 0; i < step; i++) {
-                        email_series_data[progressListing[i]]++
-                    }
                 })
                 resultsTable.draw();
                 // Setup tooltips
@@ -867,71 +848,30 @@ function load() {
                         tr.addClass('shown');
                     }
                 });
-                // Setup the graphs
-                $.each(campaign.timeline, function (i, event) {
-                    if (event.message == "Campaign Created") {
-                        return true
-                    }
-                    var event_date = moment.utc(event.time).local()
-                    timeline_series_data.push({
-                        email: event.email,
-                        message: event.message,
-                        x: event_date.valueOf(),
-                        y: 1,
-                        marker: {
-                            fillColor: statuses[event.message].color
-                        }
-                    })
-                })
-                renderTimelineChart({
-                    data: timeline_series_data
-                })
-                $.each(email_series_data, function (status, count) {
-                    var email_data = []
-                    if (!(status in statusMapping)) {
-                        return true
-                    }
-                    email_data.push({
-                        name: status,
-                        y: Math.floor((count / campaign.results.length) * 100),
-                        count: count
-                    })
-                    email_data.push({
-                        name: '',
-                        y: 100 - Math.floor((count / campaign.results.length) * 100)
-                    })
-                    var chart = renderPieChart({
-                        elemId: statusMapping[status] + '_chart',
-                        title: status,
-                        name: status,
-                        data: email_data,
-                        colors: [statuses[status].color, (window.SOC ? window.SOC.pieRemainder() : '#dddddd')]
-                    })
-                })
+                // Draw the conversion funnel and outcome donut
+                renderResultsCharts(campaign)
 
-                if (use_map) {
-                    $("#resultsMapContainer").show()
-                    var mc = (window.SOC && window.SOC.map) ? window.SOC.map()
-                        : { defaultFill: "#ffffff", point: "#283F50", border: "#283F50", highlight: "#1abc9c" }
-                    map = new Datamap({
-                        element: document.getElementById("resultsMap"),
-                        responsive: true,
-                        fills: {
-                            defaultFill: mc.defaultFill,
-                            point: mc.point
-                        },
-                        geographyConfig: {
-                            highlightFillColor: mc.highlight,
-                            borderColor: mc.border
-                        },
-                        bubblesConfig: {
-                            borderColor: mc.point
-                        }
-                    });
-                    // Datamaps measures width on creation; if the container was
-                    // hidden it can render at 0px. Force a resize once visible.
-                    setTimeout(function () { if (map && map.resize) map.resize(); }, 50)
-                }
+                // Setup the geographic distribution map
+                var mc = (window.SOC && window.SOC.map) ? window.SOC.map()
+                    : { defaultFill: "#ffffff", point: "#283F50", border: "#283F50", highlight: "#1abc9c" }
+                map = new Datamap({
+                    element: document.getElementById("resultsMap"),
+                    responsive: true,
+                    fills: {
+                        defaultFill: mc.defaultFill,
+                        point: mc.point
+                    },
+                    geographyConfig: {
+                        highlightFillColor: mc.highlight,
+                        borderColor: mc.border
+                    },
+                    bubblesConfig: {
+                        borderColor: mc.point
+                    }
+                });
+                // Datamaps measures width on creation; if the container was
+                // hidden it can render at 0px. Force a resize once visible.
+                setTimeout(function () { if (map && map.resize) map.resize(); }, 50)
                 updateMap(campaign.results)
             }
         })

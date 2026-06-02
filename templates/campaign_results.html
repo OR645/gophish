@@ -40,46 +40,55 @@
             </div>
         </div>
 
+        <!-- Campaign header -->
         <div class="panel">
-            <div class="panel-body soc-row" style="gap:16px;">
+            <div class="panel-body soc-row" style="gap:18px;flex-wrap:wrap;">
                 <span class="icon-badge lg"><i class="fa fa-bullseye"></i></span>
-                <h1 id="page-title" style="margin:0;font-size:19px;font-weight:600;letter-spacing:-0.3px;">Results for campaign.name</h1>
+                <div style="min-width:0;">
+                    <h1 id="page-title" style="margin:0;font-size:19px;font-weight:600;letter-spacing:-0.3px;">Results</h1>
+                    <div id="campaignMeta" class="mono" style="font-size:11.5px;color:var(--ink-dim);margin-top:3px;"></div>
+                </div>
+                <div style="margin-left:auto;"><span id="campaignStatus"></span></div>
             </div>
         </div>
 
-        <div class="panel">
-            <div class="panel-head"><h3>Timeline</h3><span class="sub">% success over time</span></div>
-            <div class="panel-body">
-                <div id="timeline_chart"></div>
+        <!-- Funnel + Outcome -->
+        <div class="soc-split">
+            <div class="panel">
+                <div class="panel-head"><h3>Conversion Funnel</h3><span class="sub" id="funnelSub">recipients</span></div>
+                <div class="panel-body">
+                    <div id="resultsFunnel"></div>
+                </div>
             </div>
-        </div>
-
-        <div class="panel">
-            <div class="panel-head"><h3>Conversion Breakdown</h3></div>
-            <div class="panel-body">
-                <div class="soc-row" style="justify-content:space-around;flex-wrap:wrap;gap:10px;">
-                    <div id="sent_chart" style="height:200px;flex:1 1 150px;"></div>
-                    <div id="opened_chart" style="height:200px;flex:1 1 150px;"></div>
-                    <div id="clicked_chart" style="height:200px;flex:1 1 150px;"></div>
-                    <div id="submitted_data_chart" style="height:200px;flex:1 1 150px;"></div>
-                    <div id="reported_chart" style="height:200px;flex:1 1 150px;"></div>
+            <div class="panel">
+                <div class="panel-head"><h3>Outcome</h3></div>
+                <div class="panel-body soc-row" style="align-items:center;gap:20px;flex-wrap:wrap;">
+                    <div id="outcomeChart"></div>
+                    <div class="soc-stack" id="outcomeLegend" style="gap:11px;flex:1;min-width:160px;"></div>
                 </div>
             </div>
         </div>
 
-        <div class="panel" id="resultsMapPanel">
-            <div class="panel-head"><h3>Targets Map</h3><span class="sub">click &amp; submit origins</span></div>
-            <div class="panel-body">
-                <div id="resultsMapContainer">
-                    <div class="col-md-6">
+        <!-- Geographic distribution + Top sources -->
+        <div class="soc-split">
+            <div class="panel">
+                <div class="panel-head"><h3>Geographic Distribution</h3><span class="sub">click &amp; submit origins</span></div>
+                <div class="panel-body">
+                    <div id="resultsMapContainer">
                         <div id="resultsMap"></div>
                     </div>
+                    <div id="geoFooter" class="mono" style="font-size:10.5px;color:var(--ink-faint);letter-spacing:0.5px;margin-top:10px;"></div>
                 </div>
+            </div>
+            <div class="panel">
+                <div class="panel-head"><h3>Top Sources</h3><span class="sub">by IP address</span></div>
+                <div class="panel-body geo-list" id="geoList"></div>
             </div>
         </div>
 
+        <!-- Recipient details -->
         <div class="panel table-panel">
-            <div class="panel-head"><h3>Details</h3><span class="sub">recipient timeline</span></div>
+            <div class="panel-head"><h3>Recipient Timeline</h3><span class="sub">per-recipient event log</span></div>
             <table id="resultsTable" class="table">
                 <thead>
                     <tr>

@@ -634,6 +634,10 @@ kbd { background: var(--panel-2) !important; color: var(--ink) !important; }
   border: 1px solid var(--border-soft);
 }
 .geo-map .grid { position: absolute; inset: 0; background-image: radial-gradient(var(--grid-line) 1px, transparent 1px); background-size: 16px 16px; mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, #000, transparent); opacity: .6; }
+/* Campaign-results geographic map (real Datamap fills the panel width) */
+#resultsMapContainer { width: 100%; }
+#resultsMap { position: relative; width: 100%; min-height: 300px; }
+#resultsMap svg { display: block; width: 100%; }
 .geo-list { display: flex; flex-direction: column; gap: 11px; }
 .geo-list .gi { display: flex; align-items: center; gap: 11px; }
 .geo-list .gi .gn { width: 96px; font-size: 12.5px; color: var(--ink-mid); }
