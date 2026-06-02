@@ -1,10 +1,10 @@
 {{define "body"}}
 <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
-  <div class="canvas-inner fade-up">
+  <div class="canvas-inner stack fade-up">
     <div id="flashes"></div>
-    <div class="soc-between" style="margin-bottom:18px;">
-        <div class="soc-section-title">Sending Profiles</div>
-        <button type="button" class="btn btn-primary" onclick="edit(-1)" data-toggle="modal" data-backdrop="static"
+    <div class="soc-between">
+        <div class="soc-section-title">Sending Profiles <span class="muted" id="profileCount"></span></div>
+        <button type="button" class="btn btn-sm btn-primary" onclick="edit(-1)" data-toggle="modal" data-backdrop="static"
             data-target="#modal"><i class="fa fa-plus"></i>&nbsp;New Profile</button>
     </div>
     <div id="loading">
@@ -15,20 +15,7 @@
             No profiles created yet. Let's create one!
         </div>
     </div>
-    <div class="panel table-panel">
-        <table id="profileTable" class="table" style="display:none;">
-            <thead>
-                <tr>
-                    <th class="col-md-4">Name</th>
-                    <th>Interface Type</th>
-                    <th>Last Modified Date</th>
-                    <th class="col-md-2 no-sort"></th>
-                </tr>
-            </thead>
-            <tbody>
-            </tbody>
-        </table>
-    </div>
+    <div class="soc-grid-2" id="profileGrid"></div>
   </div>
 </div>
 <!-- Modal -->

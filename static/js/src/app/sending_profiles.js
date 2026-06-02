@@ -1,4 +1,44 @@
 var profiles = []
+// Set when the Send-Test modal is opened straight from a profile card, so we
+// know to reset the (hidden) profile form once that modal closes.
+var pendingTestReset = false
+
+// ---- SOC-redesign card grid -----------------------------------------------
+// One profile card. The status pill reflects real config: a profile that
+// ignores TLS cert errors is flagged amber, otherwise it validates certs.
+function profileCardHtml(profile, i) {
+    var pill = profile.ignore_cert_errors
+        ? '<span class="pill pill-clicked"><i class="fa fa-exclamation-triangle"></i>Ignoring certs</span>'
+        : '<span class="pill pill-reported"><i class="fa fa-check"></i>TLS verified</span>'
+    var host = profile.host ? escapeHtml(profile.host) : '<span class="muted">no host set</span>'
+    var from = profile.from_address ? escapeHtml(profile.from_address) : '<span class="muted">no from address</span>'
+    return '<div class="panel">' +
+        '<div class="panel-body soc-between" style="align-items:flex-start;">' +
+        '<div class="soc-row" style="align-items:flex-start;gap:13px;">' +
+        '<div class="icon-badge"><i class="fa fa-server"></i></div>' +
+        '<div>' +
+        '<div style="font-size:14.5px;font-weight:600;color:var(--ink);">' + escapeHtml(profile.name) + '</div>' +
+        '<div class="mono" style="font-size:11.5px;color:var(--ink-dim);margin-top:4px;">' + host + '</div>' +
+        '<div class="mono" style="font-size:11.5px;color:var(--ink-dim);margin-top:3px;"><i class="fa fa-paper-plane-o" style="margin-right:5px;"></i>' + from + '</div>' +
+        '</div></div>' + pill +
+        '</div>' +
+        '<div class="panel-head" style="border-top:1px solid var(--border-soft);border-bottom:none;padding:11px var(--pad);">' +
+        '<button type="button" class="btn btn-sm btn-ghost" onclick="sendTestForProfile(' + i + ')"><i class="fa fa-bolt"></i>&nbsp;Send test</button>' +
+        '<button type="button" class="btn btn-sm btn-ghost" data-toggle="modal" data-backdrop="static" data-target="#modal" onclick="edit(' + i + ')"><i class="fa fa-pencil"></i>&nbsp;Edit</button>' +
+        '<div class="head-actions">' +
+        '<button type="button" class="icon-btn" style="width:30px;height:30px;" data-toggle="modal" data-target="#modal" onclick="copy(' + i + ')" title="Copy Profile"><i class="fa fa-copy"></i></button>' +
+        '<button type="button" class="icon-btn" style="width:30px;height:30px;color:var(--c-submitted);" onclick="deleteProfile(' + i + ')" title="Delete Profile"><i class="fa fa-trash-o"></i></button>' +
+        '</div></div></div>'
+}
+
+// Quick "Send test" from a card: populate the (hidden) profile form via edit()
+// so sendTestEmail() can read it, then open the test modal. The form is reset
+// when the test modal closes (see pendingTestReset handler).
+function sendTestForProfile(idx) {
+    edit(idx)
+    pendingTestReset = true
+    $("#sendTestEmailModal").modal("show")
+}
 
 // Attempts to send a test email by POSTing to /campaigns/
 function sendTestEmail() {
@@ -186,41 +226,16 @@ function copy(idx) {
 }
 
 function load() {
-    $("#profileTable").hide()
     $("#emptyMessage").hide()
     $("#loading").show()
+    $("#profileGrid").empty()
     api.SMTP.get()
         .success(function (ss) {
             profiles = ss
             $("#loading").hide()
+            $("#profileCount").text(profiles.length ? "· " + profiles.length : "")
             if (profiles.length > 0) {
-                $("#profileTable").show()
-                profileTable = $("#profileTable").DataTable({
-                    destroy: true,
-                    columnDefs: [{
-                        orderable: false,
-                        targets: "no-sort"
-                    }]
-                });
-                profileTable.clear()
-                profileRows = []
-                $.each(profiles, function (i, profile) {
-                    profileRows.push([
-                        escapeHtml(profile.name),
-                        profile.interface_type,
-                        moment(profile.modified_date).format('MMMM Do YYYY, h:mm:ss a'),
-                        "<div class='pull-right'><span data-toggle='modal' data-backdrop='static' data-target='#modal'><button class='btn btn-primary' data-toggle='tooltip' data-placement='left' title='Edit Profile' onclick='edit(" + i + ")'>\
-                    <i class='fa fa-pencil'></i>\
-                    </button></span>\
-		    <span data-toggle='modal' data-target='#modal'><button class='btn btn-primary' data-toggle='tooltip' data-placement='left' title='Copy Profile' onclick='copy(" + i + ")'>\
-                    <i class='fa fa-copy'></i>\
-                    </button></span>\
-                    <button class='btn btn-danger' data-toggle='tooltip' data-placement='left' title='Delete Profile' onclick='deleteProfile(" + i + ")'>\
-                    <i class='fa fa-trash-o'></i>\
-                    </button></div>"
-                    ])
-                })
-                profileTable.rows.add(profileRows).draw()
+                $("#profileGrid").html(profiles.map(profileCardHtml).join(""))
                 $('[data-toggle="tooltip"]').tooltip()
             } else {
                 $("#emptyMessage").show()
@@ -308,6 +323,12 @@ $(document).ready(function () {
     });
     $("#sendTestEmailModal").on("hidden.bs.modal", function (event) {
         dismissSendTestEmailModal()
+        // If the test modal was opened straight from a profile card, reset the
+        // (hidden) profile form so a later "New Profile" starts clean.
+        if (pendingTestReset) {
+            pendingTestReset = false
+            dismiss()
+        }
     })
     // Code to deal with custom email headers
     $("#addCustomHeader").on('click', function () {
