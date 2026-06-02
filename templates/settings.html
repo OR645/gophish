@@ -1,10 +1,10 @@
 {{define "body"}}
 <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
-    <div class="row">
-        <h1 class="page-header">Settings</h1>
-    </div>
+  <div class="canvas-inner fade-up">
     <div id="flashes" class="row"></div>
     {{template "flashes" .Flashes}}
+    <div class="soc-section-title" style="margin-bottom:14px;">Account &amp; System Settings</div>
+    <div class="panel">
     <!-- Nav tabs -->
     <ul class="nav nav-tabs" role="tablist">
         <li class="active" role="mainSettings"><a href="#mainSettings" aria-controls="mainSettings" role="tab"
@@ -15,6 +15,7 @@
             data-toggle="tab">Reporting Settings</a></li>
     </ul>
     <!-- Tab Panes -->
+    <div class="panel-body">
     <div class="tab-content">
         <div role="tabpanel" class="tab-pane active" id="mainSettings">
             <br />
@@ -242,6 +243,9 @@
         </div>
         <!-- Reporting Settings End -->
     </div>
+    </div>
+    </div>
+  </div>
 </div>
 {{end}} {{define "scripts"}}
 <script src="/js/dist/app/passwords.min.js"></script>

@@ -1,71 +1,85 @@
 {{define "body"}}
 <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
+  <div class="canvas-inner fade-up">
     <div id="loading">
         <i class="fa fa-spinner fa-spin fa-4x"></i>
     </div>
-    <div style="display:none;" id="campaignResults">
-        <div class="row">
-            <h1 class="page-header" id="page-title">Results for campaign.name</h1>
-        </div>
-        <div class="row">
-            <a href="/campaigns" class="btn btn-default">
-                <i class="fa fa-arrow-circle-o-left fa-lg"></i> Back
+    <div style="display:none;" id="campaignResults" class="soc-stack">
+        <div class="soc-between" style="flex-wrap:wrap;gap:10px;">
+            <a href="/campaigns" class="btn btn-sm btn-default">
+                <i class="fa fa-arrow-circle-o-left"></i>&nbsp;Back to Campaigns
             </a>
-            <div class="btn-group">
-                <button type="button" id="exportButton" class="btn btn-primary dropdown-toggle" data-toggle="dropdown"
-                    aria-haspopup="true" aria-expanded="true">
-                    <i class="fa fa-file-excel-o"></i> Export CSV
-                    <i class="fa fa-caret-down"></i>
+            <div class="soc-row" style="flex-wrap:wrap;gap:8px;">
+                <div class="btn-group">
+                    <button type="button" id="exportButton" class="btn btn-sm btn-default dropdown-toggle" data-toggle="dropdown"
+                        aria-haspopup="true" aria-expanded="true">
+                        <i class="fa fa-file-excel-o"></i> Export CSV
+                        <i class="fa fa-caret-down"></i>
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="exportButton">
+                        <li>
+                            <a href="#" onclick="exportAsCSV('results')">Results</a>
+                        </li>
+                        <li>
+                            <a href="#" onclick="exportAsCSV('events')">Raw Events</a>
+                        </li>
+                    </ul>
+                </div>
+                <button id="refresh_btn" type="button" class="btn btn-sm btn-default" data-toggle="tooltip" onclick="refresh()">
+                    <i class="fa fa-refresh"></i> Refresh
                 </button>
-                <ul class="dropdown-menu" aria-labelledby="exportButton">
-                    <li>
-                        <a href="#" onclick="exportAsCSV('results')">Results</a>
-                    </li>
-                    <li>
-                        <a href="#" onclick="exportAsCSV('events')">Raw Events</a>
-                    </li>
-                </ul>
+                <button id="complete_button" type="button" class="btn btn-sm btn-primary" data-toggle="tooltip" onclick="completeCampaign()">
+                    <i class="fa fa-flag-checkered"></i> Complete
+                </button>
+                <button type="button" class="btn btn-sm btn-danger" data-toggle="tooltip" onclick="deleteCampaign()">
+                    <i class="fa fa-trash-o"></i> Delete
+                </button>
+                <span id="refresh_message">
+                    <i class="fa fa-spin fa-spinner"></i> Refreshing
+                </span>
             </div>
-            <button id="complete_button" type="button" class="btn btn-blue" data-toggle="tooltip" onclick="completeCampaign()">
-                <i class="fa fa-flag-checkered"></i> Complete
-            </button>
-            <button type="button" class="btn btn-danger" data-toggle="tooltip" onclick="deleteCampaign()">
-                <i class="fa fa-trash-o fa-lg"></i> Delete
-            </button>
-            <button id="refresh_btn" type="button" class="btn btn-blue" data-toggle="tooltip" onclick="refresh()">
-                <i class="fa fa-refresh fa-lg"></i> Refresh
-            </button>
-            <span id="refresh_message">
-                <i class="fa fa-spin fa-spinner"></i> Refreshing
-            </span>
         </div>
-        <br />
-        <div class="row">
-            <div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
-                <div class="row">
-                    <div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
-                        <div id="timeline_chart"></div>
-                    </div>
+
+        <div class="panel">
+            <div class="panel-body soc-row" style="gap:16px;">
+                <span class="icon-badge lg"><i class="fa fa-bullseye"></i></span>
+                <h1 id="page-title" style="margin:0;font-size:19px;font-weight:600;letter-spacing:-0.3px;">Results for campaign.name</h1>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-head"><h3>Timeline</h3><span class="sub">% success over time</span></div>
+            <div class="panel-body">
+                <div id="timeline_chart"></div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-head"><h3>Conversion Breakdown</h3></div>
+            <div class="panel-body">
+                <div class="soc-row" style="justify-content:space-around;flex-wrap:wrap;gap:10px;">
+                    <div id="sent_chart" style="height:200px;flex:1 1 150px;"></div>
+                    <div id="opened_chart" style="height:200px;flex:1 1 150px;"></div>
+                    <div id="clicked_chart" style="height:200px;flex:1 1 150px;"></div>
+                    <div id="submitted_data_chart" style="height:200px;flex:1 1 150px;"></div>
+                    <div id="reported_chart" style="height:200px;flex:1 1 150px;"></div>
                 </div>
-                <div class="row">
-                    <div style="height:200px;" class="col-lg-1 col-md-1"></div>
-                    <div id="sent_chart" style="height:200px;" class="col-lg-2 col-md-2"></div>
-                    <div id="opened_chart" style="height:200px;" class="col-lg-2 col-md-2"></div>
-                    <div id="clicked_chart" style="height:200px;" class="col-lg-2 col-md-2"></div>
-                    <div id="submitted_data_chart" style="height:200px;" class="col-lg-2 col-md-2"></div>
-                    <div id="reported_chart" style="height:200px;" class="col-lg-2 col-md-2"></div>
-                    <div style="height:200px;" class="col-lg-1 col-md-1"></div>
-                </div>
-                <div class="row" id="resultsMapContainer">
+            </div>
+        </div>
+
+        <div class="panel" id="resultsMapPanel">
+            <div class="panel-head"><h3>Targets Map</h3><span class="sub">click &amp; submit origins</span></div>
+            <div class="panel-body">
+                <div id="resultsMapContainer">
                     <div class="col-md-6">
-                        <p style="text-align:center;">Targets Map</p>
                         <div id="resultsMap"></div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="row">
-            <h2>Details</h2>
+
+        <div class="panel table-panel">
+            <div class="panel-head"><h3>Details</h3><span class="sub">recipient timeline</span></div>
             <table id="resultsTable" class="table">
                 <thead>
                     <tr>
@@ -85,6 +99,7 @@
         </div>
     </div>
     <div id="flashes" class="row"></div>
+  </div>
 </div>
 {{end}} {{define "scripts"}}
 <script src="/js/dist/app/campaign_results.min.js"></script>

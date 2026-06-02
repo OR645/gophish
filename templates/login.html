@@ -1,6 +1,6 @@
 {{ define "base" }}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 
 <head>
     <meta charset="utf-8">
@@ -20,40 +20,49 @@
     <link href="/css/soc.css" rel="stylesheet" type="text/css">
 </head>
 
-<body>
-    <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
-        <div class="container-fluid">
-            <div class="navbar-header">
-                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
-                    <span class="sr-only">Toggle navigation</span>
-                    <span class="icon-bar"></span>
-                    <span class="icon-bar"></span>
-                    <span class="icon-bar"></span>
-                </button>
-                <img class="navbar-logo" src="/images/logo_inv_small.png" />
-                <a class="navbar-brand" href="/">&nbsp;gophish</a>
+<body class="auth">
+    <div class="login-stage">
+        <aside class="login-aside">
+            <div class="gridbg"></div>
+            <div class="glow"></div>
+            <div class="brand">
+                <span class="brand-mark"><i class="fa fa-bullseye"></i></span>
+                <span class="brand-name"><b>Gophish</b><small>SECURITY AWARENESS</small></span>
             </div>
-            <div class="navbar-collapse collapse">
-                <ul class="nav navbar-nav navbar-right">
-                    <li>
-                        <a id="login-button" href="/login">
-                            <button type="button" class="btn btn-primary">Login</button>
-                        </a>
-                    </li>
-                </ul>
+            <div class="lead">
+                <div class="eyebrow">// PHISHING SIMULATION PLATFORM</div>
+                <h1>Train your people to spot the threats that get through.</h1>
+                <p>Launch realistic campaigns, measure who clicks, and turn every result into a teachable moment.</p>
+                <div class="stats">
+                    <div><div class="num">SOC</div><div class="lbl">edition</div></div>
+                    <div><div class="num">Self</div><div class="lbl">hosted</div></div>
+                    <div><div class="num">2FA</div><div class="lbl">ready</div></div>
+                </div>
+            </div>
+            <div class="foot">self-hosted &middot; SOC console edition</div>
+        </aside>
+        <div class="login-form-wrap">
+            <div class="login-card">
+                <h2>Sign in</h2>
+                <p class="subtitle">Access the campaign console</p>
+                {{template "flashes" .Flashes}}
+                <form class="form-signin" action="" method="POST">
+                    <div class="field" style="margin-bottom:14px;">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" name="username" class="form-control" placeholder="Username" required autofocus>
+                    </div>
+                    <div class="field" style="margin-bottom:14px;">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" class="form-control" placeholder="Password" autocomplete="off" required>
+                    </div>
+                    <input type="hidden" name="csrf_token" value="{{.Token}}" />
+                    <button class="btn btn-lg btn-primary btn-block" type="submit">Sign in to console</button>
+                </form>
+                <div class="row" style="justify-content:center;display:flex;gap:8px;color:var(--ink-faint);font-size:12px;margin-top:16px;">
+                    <i class="fa fa-shield"></i> Protected by your organization's policy
+                </div>
             </div>
         </div>
-    </div>
-    <div class="container">
-        <form class="form-signin" action="" method="POST">
-            <img id="logo" src="/images/logo_purple.png" />
-            <h2 class="form-signin-heading">Please sign in</h2>
-            {{template "flashes" .Flashes}}
-            <input type="text" name="username" class="form-control top-input" placeholder="Username" required autofocus>
-            <input type="password" name="password" class="form-control bottom-input" placeholder="Password" autocomplete="off" required>
-            <input type="hidden" name="csrf_token" value="{{.Token}}" />
-            <button class="btn btn-lg btn-primary btn-block" type="submit">Sign in</button>
-        </form>
     </div>
     <!-- Placed at the end of the document so the pages load faster -->
     <script src="/js/dist/vendor.min.js"></script>

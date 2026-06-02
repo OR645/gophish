@@ -1,23 +1,19 @@
 {{define "body"}}
 <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
-    <div class="row">
-        <h1 class="page-header">
-            {{.Title}}
-        </h1>
-    </div>
-    <div id="flashes" class="row">
+  <div class="canvas-inner fade-up">
+    <div id="flashes">
         {{template "flashes" .Flashes}}
     </div>
-    <div class="row">
+    <div class="soc-between" style="margin-bottom:18px;">
+        <div class="soc-section-title">User Management</div>
         <button type="button" class="btn btn-primary" id="new_button" data-toggle="modal" data-backdrop="static"
             data-user-id="-1" data-target="#modal">
-            <i class="fa fa-plus"></i> New User</button>
+            <i class="fa fa-plus"></i>&nbsp;New User</button>
     </div>
-    &nbsp;
     <div id="loading">
         <i class="fa fa-spinner fa-spin fa-4x"></i>
     </div>
-    <div class="row">
+    <div class="panel table-panel">
         <table id="userTable" class="table" style="display:none;">
             <thead>
                 <tr>
@@ -31,6 +27,7 @@
             </tbody>
         </table>
     </div>
+  </div>
 </div>
 <!-- Modal -->
 <div class="modal fade" id="modal" tabindex="-1" role="dialog" aria-labelledby="modalLabel">
