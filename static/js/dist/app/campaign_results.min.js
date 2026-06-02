@@ -360,6 +360,18 @@ var renderDevice = function (event_details) {
         deviceBrowser + ' ' + browserVersion + '</div>'
 
     detailsString += browserString
+
+    // Show the IP address that the recipient connected from. Gophish records
+    // this on each "Clicked Link" / "Submitted Data" event in browser.address.
+    var ipAddress = (event_details.browser && event_details.browser['address']) ?
+        event_details.browser['address'] : ''
+    if (ipAddress) {
+        var ipString = '<div class="timeline-device-ip"><span class="fa fa-stack">' +
+            '<i class="fa fa-map-marker fa-stack-1x"></i></span> ' +
+            'IP Address: ' + escapeHtml(ipAddress) + '</div>'
+        detailsString += ipString
+    }
+
     detailsString += '</div>'
     return detailsString
 }
@@ -407,6 +419,13 @@ function renderTimeline(data) {
                     results += '<div class="timeline-event-results">'
                     results += '    <table class="table table-condensed table-bordered table-striped">'
                     results += '        <thead><tr><th>Parameter</th><th>Value(s)</tr></thead><tbody>'
+                    // Record the source IP address alongside the submitted data
+                    if (details.browser && details.browser['address']) {
+                        results += '    <tr>'
+                        results += '        <td>IP Address</td>'
+                        results += '        <td>' + escapeHtml(details.browser['address']) + '</td>'
+                        results += '    </tr>'
+                    }
                     $.each(Object.keys(details.payload), function (i, param) {
                         if (param == "rid") {
                             return true;
@@ -589,6 +608,7 @@ var updateMap = function (results) {
         $.each(bubbles, function (i, bubble) {
             if (bubble.ip == result.ip) {
                 bubbles[i].radius += 1
+                bubbles[i].count += 1
                 newIP = false
                 return false
             }
@@ -598,12 +618,23 @@ var updateMap = function (results) {
                 latitude: result.latitude,
                 longitude: result.longitude,
                 name: result.ip,
+                ip: result.ip,
+                count: 1,
                 fillKey: "point",
                 radius: 2
             })
         }
     })
-    map.bubbles(bubbles)
+    // Mark each origin on the map and show the IP address (and how many
+    // recipients connected from it) when hovering the bubble.
+    map.bubbles(bubbles, {
+        popupTemplate: function (geo, data) {
+            return '<div class="hoverinfo">' +
+                '<strong>IP Address:</strong> ' + escapeHtml(data.name) +
+                '<br><strong>Events:</strong> ' + escapeHtml(String(data.count)) +
+                '</div>'
+        }
+    })
 }
 
 /**

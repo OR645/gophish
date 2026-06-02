@@ -222,12 +222,15 @@ body > .navbar.navbar-fixed-top { display: none !important; }
 .icon-btn:hover { background: var(--hover); color: var(--ink); }
 .icon-btn i { font-size: 15px; }
 
-.canvas { flex: 1; overflow-y: auto; padding: var(--pad); min-height: 0; }
-.canvas-inner { max-width: 1320px; margin: 0 auto; }
+/* Content fills the full page width — no centered max-width, no side gutters.
+   Only vertical padding is kept; horizontal space is removed entirely. */
+.canvas { flex: 1; overflow-y: auto; padding: var(--pad) 0; min-height: 0; }
+.canvas-inner { max-width: none; margin: 0; width: 100%; }
 
-/* Neutralize the legacy Bootstrap offset column wrapper around page bodies */
+/* Neutralize the legacy Bootstrap offset column wrapper around page bodies so
+   the body stretches to the page width instead of being pushed/centered. */
 .canvas .main {
-  width: 100% !important; max-width: 1320px; margin: 0 auto !important; padding: 0 !important;
+  width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0 !important;
   float: none !important; position: static !important;
 }
 .canvas [class*="col-sm-offset"],
