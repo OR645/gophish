@@ -1049,6 +1049,13 @@ function resendSelected() {
     })
 }
 
+// generateReport builds the Yazamco phishing assessment report for the current
+// campaign. openCampaignReport() (report.js) re-fetches the full campaign so the
+// URL is present even if the page was loaded from the results-only endpoint.
+function generateReport() {
+    openCampaignReport(campaign.id)
+}
+
 function report_mail(rid, cid) {
     Swal.fire({
         title: "Are you sure?",

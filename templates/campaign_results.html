@@ -31,6 +31,9 @@
                 <button id="bulk_resend_button" type="button" class="btn btn-sm btn-warning" style="display:none;" data-toggle="tooltip" title="Resend the email to the selected recipients" onclick="resendSelected()">
                     <i class="fa fa-paper-plane"></i> Resend Selected (<span id="bulk_resend_count">0</span>)
                 </button>
+                <button id="report_button" type="button" class="btn btn-sm btn-success" data-toggle="tooltip" title="Generate phishing assessment report" onclick="generateReport()">
+                    <i class="fa fa-file-text-o"></i> Report
+                </button>
                 <button id="complete_button" type="button" class="btn btn-sm btn-primary" data-toggle="tooltip" onclick="completeCampaign()">
                     <i class="fa fa-flag-checkered"></i> Complete
                 </button>
@@ -117,5 +120,6 @@
   </div>
 </div>
 {{end}} {{define "scripts"}}
+<script src="/js/dist/app/report.min.js"></script>
 <script src="/js/dist/app/campaign_results.min.js"></script>
 {{end}}

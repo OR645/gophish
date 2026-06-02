@@ -56,6 +56,7 @@ function campaignRowHtml(campaign, idx) {
         '<td class="num strong" data-order="' + rate + '">' + rate + '%</td>' +
         '<td class="no-sort"><div style="display:flex;gap:6px;justify-content:flex-end;">' +
         '<a class="icon-btn" style="width:30px;height:30px;" href="/campaigns/' + campaign.id + '" data-toggle="tooltip" data-placement="top" title="View Results"><i class="fa fa-bar-chart"></i></a>' +
+        '<button class="icon-btn" style="width:30px;height:30px;" data-toggle="tooltip" data-placement="top" title="Generate Report" onclick="reportCampaign(' + idx + ')"><i class="fa fa-file-text-o"></i></button>' +
         '<span data-toggle="modal" data-backdrop="static" data-target="#modal"><button class="icon-btn" style="width:30px;height:30px;" data-toggle="tooltip" data-placement="top" title="Copy Campaign" onclick="copy(' + idx + ')"><i class="fa fa-copy"></i></button></span>' +
         '<button class="icon-btn" style="width:30px;height:30px;color:var(--c-submitted);" data-toggle="tooltip" data-placement="top" title="Delete Campaign" onclick="deleteCampaign(' + idx + ')"><i class="fa fa-trash-o"></i></button>' +
         '</div></td>' +
@@ -195,6 +196,13 @@ function dismiss() {
     $("#profile").val("").change();
     $("#users").val("").change();
     $("#modal").modal('hide');
+}
+
+// reportCampaign generates the Yazamco phishing report for a campaign in the
+// list. Delegates to openCampaignReport() (report.js), which fetches the full
+// campaign data and prompts for the company name.
+function reportCampaign(idx) {
+    openCampaignReport(campaigns[idx].id)
 }
 
 function deleteCampaign(idx) {
