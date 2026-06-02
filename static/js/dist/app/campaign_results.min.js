@@ -679,11 +679,8 @@ var updateMap = function (results) {
     // Only geolocated sources can be drawn on the map.
     bubbles = sources.filter(function (s) { return s.located })
     // Mark each origin on the map and show the IP address (and how many
-    // recipients connected from it) when hovering the bubble. Resize first so
-    // bubbles are positioned against the container's current width (datamaps
-    // computes bubble coordinates from the projection at call time).
+    // recipients connected from it) when hovering the bubble.
     if (map) {
-        if (map.resize) map.resize()
         map.bubbles(bubbles, {
             popupTemplate: function (geo, data) {
                 return '<div class="hoverinfo">' +
