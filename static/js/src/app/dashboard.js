@@ -196,7 +196,7 @@ function generateStatsPieCharts(campaigns) {
             title: status_label,
             name: status,
             data: stats_data,
-            colors: [statuses[status_label].color, "#dddddd"]
+            colors: [statuses[status_label].color, (window.SOC ? window.SOC.pieRemainder() : "#dddddd")]
         })
 
         stats_data = []

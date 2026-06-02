@@ -439,3 +439,95 @@ table.dataTable thead .sorting:after, table.dataTable thead .sorting_asc:after, 
 .fade-up { animation: socFadeUp .4s cubic-bezier(.2,.7,.2,1) both; }
 @keyframes socFadeUp { from { transform: translateY(9px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .fade-up { animation: none; } }
+
+/* ============================================================
+   EXTENDED BOOTSTRAP COVERAGE
+   ============================================================ */
+/* in-content typography */
+.canvas h1, .canvas h2, .canvas h3, .canvas h4, .canvas h5 { color: var(--ink); font-weight: 600; letter-spacing: -0.2px; }
+.canvas h2 { font-size: 18px; margin: 6px 0 12px; }
+.canvas h3 { font-size: 15px; }
+.canvas p, .canvas .help-block, .canvas .text-muted, .canvas small { color: var(--ink-dim); }
+.canvas label, .canvas .control-label { color: var(--ink-mid); }
+code, pre, kbd, .mono, .gophish-editor {
+  font-family: var(--mono-font) !important;
+}
+pre, code { background: var(--bg-sink) !important; color: var(--ink-mid) !important; border: 1px solid var(--border-soft) !important; border-radius: var(--radius-sm); }
+kbd { background: var(--panel-2) !important; color: var(--ink) !important; }
+
+/* extra button variants used around the app */
+.btn-blue { background: var(--accent) !important; border-color: transparent !important; color: var(--accent-ink) !important; box-shadow: 0 6px 16px -8px var(--accent); }
+.btn-blue:hover, .btn-blue:focus { background: var(--accent-strong) !important; color: var(--accent-ink) !important; }
+.btn-group .btn { border-radius: 0 !important; }
+.btn-group .btn:first-child { border-top-left-radius: 9px !important; border-bottom-left-radius: 9px !important; }
+.btn-group .btn:last-child { border-top-right-radius: 9px !important; border-bottom-right-radius: 9px !important; }
+.btn .caret { border-top-color: currentColor; }
+
+/* dropdown menus */
+.dropdown-menu {
+  background: var(--panel) !important; border: 1px solid var(--border) !important;
+  border-radius: var(--radius-sm) !important; box-shadow: var(--shadow) !important; padding: 6px;
+}
+.dropdown-menu > li > a { color: var(--ink-mid) !important; border-radius: 6px; padding: 7px 12px; }
+.dropdown-menu > li > a:hover, .dropdown-menu > li > a:focus { background: var(--hover) !important; color: var(--ink) !important; }
+.dropdown-menu .divider { background: var(--border-soft); }
+
+/* tooltips & popovers */
+.tooltip-inner { background: var(--panel-2) !important; color: var(--ink) !important; border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: var(--ui-font); font-size: 12px; box-shadow: var(--shadow); }
+.tooltip.top .tooltip-arrow, .tooltip.bottom .tooltip-arrow, .tooltip.left .tooltip-arrow, .tooltip.right .tooltip-arrow { border-color: transparent; }
+.popover { background: var(--panel) !important; border: 1px solid var(--border) !important; border-radius: var(--radius-sm) !important; box-shadow: var(--shadow) !important; color: var(--ink); }
+.popover-title { background: transparent !important; color: var(--ink) !important; border-bottom: 1px solid var(--border-soft) !important; }
+.popover-content { color: var(--ink-mid) !important; }
+
+/* labels (status pills in result tables) */
+.label { border-radius: 20px; font-weight: 600; font-family: var(--mono-font); font-size: 11px; padding: 3px 9px; }
+.label-default { background: var(--panel-2) !important; color: var(--ink-dim) !important; }
+.label-primary, .label-info { background: var(--accent-soft) !important; color: var(--accent-ink) !important; }
+:root[data-theme="light"] .label-primary, :root[data-theme="light"] .label-info { color: var(--accent-strong) !important; }
+.label-success { background: color-mix(in oklch, var(--c-reported) 16%, transparent) !important; color: var(--c-reported) !important; }
+.label-warning { background: color-mix(in oklch, var(--c-clicked) 16%, transparent) !important; color: var(--c-clicked) !important; }
+.label-danger, .label-clicked { background: color-mix(in oklch, var(--c-submitted) 16%, transparent) !important; color: var(--c-submitted) !important; }
+
+/* progress bars */
+.progress { background: var(--panel-2) !important; border-radius: 20px !important; box-shadow: none !important; height: 8px; }
+.progress-bar { background: var(--accent) !important; }
+
+/* pagination */
+.pagination > li > a, .pagination > li > span { background: var(--panel) !important; border-color: var(--border) !important; color: var(--ink-mid) !important; }
+.pagination > li > a:hover { background: var(--hover) !important; color: var(--ink) !important; }
+.pagination > .active > a, .pagination > .active > span, .pagination > .active > a:hover { background: var(--accent) !important; border-color: transparent !important; color: var(--accent-ink) !important; }
+
+/* list groups */
+.list-group-item { background: var(--panel) !important; border-color: var(--border-soft) !important; color: var(--ink-mid) !important; }
+.list-group-item.active { background: var(--accent-soft) !important; border-color: var(--accent-line) !important; color: var(--accent-ink) !important; }
+
+/* input groups */
+.input-group-addon { background: var(--panel-2) !important; border-color: var(--border) !important; color: var(--ink-dim) !important; border-radius: 9px; }
+
+/* well / panel-default headings */
+.panel-default > .panel-heading { background: transparent !important; color: var(--ink) !important; }
+.panel-title { color: var(--ink) !important; }
+
+/* checkboxes (flat-ui checkbox styles) keep accent */
+.checkbox label, .radio label { color: var(--ink-mid) !important; }
+
+/* ============================================================
+   CAMPAIGN RESULTS — world map
+   ============================================================ */
+#resultsMapContainer { margin-top: 18px; }
+#resultsMapContainer > .col-md-6 {
+  background: var(--panel); border: 1px solid var(--border-soft);
+  border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px 18px; float: none; width: 100%; max-width: 640px;
+}
+#resultsMapContainer p { color: var(--ink-mid) !important; font-weight: 600; font-family: var(--mono-font); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+#resultsMap { min-height: 340px; width: 100%; position: relative; }
+#resultsMap svg { display: block; margin: 0 auto; }
+.datamaps-hoverover {
+  background: var(--panel-2) !important; color: var(--ink) !important;
+  border: 1px solid var(--border) !important; border-radius: var(--radius-sm) !important;
+  font-family: var(--ui-font) !important; padding: 6px 10px !important; box-shadow: var(--shadow);
+}
+
+/* Highcharts container backgrounds (belt-and-braces with the JS theme) */
+.highcharts-background { fill: transparent !important; }
+.highcharts-container, .highcharts-root { font-family: var(--mono-font) !important; }

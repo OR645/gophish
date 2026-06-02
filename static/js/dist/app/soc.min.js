@@ -6,6 +6,43 @@
 (function () {
     "use strict";
 
+    // ---- chart / map theming -----------------------------------------
+    // Highcharts and Datamaps render SVG with hardcoded light colors. We
+    // expose a small theme-aware palette (window.SOC) used by the chart
+    // files, and register a dark Highcharts default. Highcharts colors must
+    // be hex/rgb (its Color class can't parse oklch), so these are literal.
+    function isDark() {
+        return (document.documentElement.getAttribute("data-theme") || "dark") !== "light";
+    }
+    var PALETTE = {
+        dark:  { text: "#c9ced6", faint: "#8a909c", grid: "rgba(255,255,255,0.07)", line: "rgba(255,255,255,0.13)", tip: "#272b33", tipText: "#e7e9ee", pieRemainder: "rgba(255,255,255,0.08)", mapLand: "#2a2f38", mapBorder: "#3a414c", mapBubble: "#7c5cff", mapHighlight: "#3a414c" },
+        light: { text: "#3a4150", faint: "#7a828f", grid: "rgba(0,0,0,0.07)", line: "rgba(0,0,0,0.13)", tip: "#ffffff", tipText: "#222831", pieRemainder: "#e7ebf0", mapLand: "#e9edf2", mapBorder: "#cfd6df", mapBubble: "#3b6ef5", mapHighlight: "#d4dae2" }
+    };
+    function pal() { return isDark() ? PALETTE.dark : PALETTE.light; }
+    window.SOC = {
+        isDark: isDark,
+        pal: pal,
+        pieRemainder: function () { return pal().pieRemainder; },
+        map: function () { var p = pal(); return { defaultFill: p.mapLand, point: p.mapBubble, border: p.mapBorder, highlight: p.mapHighlight }; }
+    };
+    function themeHighcharts() {
+        if (!window.Highcharts || !Highcharts.setOptions) return;
+        var p = pal();
+        Highcharts.setOptions({
+            chart: { backgroundColor: "transparent", style: { fontFamily: "'IBM Plex Sans', system-ui, sans-serif" } },
+            title: { style: { color: p.text } },
+            subtitle: { style: { color: p.faint } },
+            xAxis: { gridLineColor: p.grid, lineColor: p.line, tickColor: p.line, labels: { style: { color: p.faint } }, title: { style: { color: p.faint } } },
+            yAxis: { gridLineColor: p.grid, lineColor: p.line, tickColor: p.line, labels: { style: { color: p.faint } }, title: { style: { color: p.faint } } },
+            legend: { itemStyle: { color: p.text }, itemHoverStyle: { color: isDark() ? "#fff" : "#000" }, itemHiddenStyle: { color: p.faint } },
+            tooltip: { backgroundColor: p.tip, borderColor: p.line, style: { color: p.tipText } },
+            plotOptions: { series: { dataLabels: { color: p.text, style: { textOutline: "none" } } } },
+            credits: { enabled: false }
+        });
+    }
+    // Apply immediately (synchronously) so charts rendered later pick it up.
+    themeHighcharts();
+
     var SUBTITLES = {
         "/": "real-time overview · all campaigns",
         "/campaigns": "manage & launch simulations",
@@ -39,6 +76,11 @@
             document.documentElement.setAttribute("data-theme", next);
             try { localStorage.setItem("gophish-theme", next); } catch (e) { }
             paintToggle();
+            // SVG charts/maps can't pick up CSS variables; reload so they
+            // re-render in the new theme. Only when such widgets exist.
+            var hasCharts = (window.Highcharts && Highcharts.charts && Highcharts.charts.some(Boolean)) ||
+                document.getElementById("resultsMap");
+            if (hasCharts) { location.reload(); }
         });
     }
 

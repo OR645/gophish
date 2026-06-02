@@ -874,27 +874,32 @@ function load() {
                         title: status,
                         name: status,
                         data: email_data,
-                        colors: [statuses[status].color, '#dddddd']
+                        colors: [statuses[status].color, (window.SOC ? window.SOC.pieRemainder() : '#dddddd')]
                     })
                 })
 
                 if (use_map) {
                     $("#resultsMapContainer").show()
+                    var mc = (window.SOC && window.SOC.map) ? window.SOC.map()
+                        : { defaultFill: "#ffffff", point: "#283F50", border: "#283F50", highlight: "#1abc9c" }
                     map = new Datamap({
                         element: document.getElementById("resultsMap"),
                         responsive: true,
                         fills: {
-                            defaultFill: "#ffffff",
-                            point: "#283F50"
+                            defaultFill: mc.defaultFill,
+                            point: mc.point
                         },
                         geographyConfig: {
-                            highlightFillColor: "#1abc9c",
-                            borderColor: "#283F50"
+                            highlightFillColor: mc.highlight,
+                            borderColor: mc.border
                         },
                         bubblesConfig: {
-                            borderColor: "#283F50"
+                            borderColor: mc.point
                         }
                     });
+                    // Datamaps measures width on creation; if the container was
+                    // hidden it can render at 0px. Force a resize once visible.
+                    setTimeout(function () { if (map && map.resize) map.resize(); }, 50)
                 }
                 updateMap(campaign.results)
             }
