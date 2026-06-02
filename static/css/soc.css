@@ -222,10 +222,10 @@ body > .navbar.navbar-fixed-top { display: none !important; }
 .icon-btn:hover { background: var(--hover); color: var(--ink); }
 .icon-btn i { font-size: 15px; }
 
-/* Content fills the full page width — no centered max-width, no side gutters.
-   Only vertical padding is kept; horizontal space is removed entirely. */
-.canvas { flex: 1; overflow-y: auto; padding: var(--pad) 0; min-height: 0; }
-.canvas-inner { max-width: none; margin: 0; width: 100%; }
+/* Match the reference design: equal gutters on all sides, content centered
+   within a max-width column. */
+.canvas { flex: 1; overflow-y: auto; padding: var(--pad); min-height: 0; }
+.canvas-inner { max-width: 1320px; margin: 0 auto; }
 
 /* Neutralize the legacy Bootstrap offset column wrapper around page bodies so
    the body stretches to the page width instead of being pushed/centered. */
@@ -377,6 +377,8 @@ table.dataTable thead .sorting:after, table.dataTable thead .sorting_asc:after, 
 .soc-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .soc-split { display: grid; grid-template-columns: 1.55fr 1fr; gap: 14px; }
 .soc-between { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+/* vertical layout helper from the reference design — spaces a page's sections */
+.stack { display: flex; flex-direction: column; gap: 14px; }
 .soc-section-title { font-size: 14px; font-weight: 600; color: var(--ink); margin: 2px 0; }
 .soc-muted { color: var(--ink-dim); }
 .soc-mono { font-family: var(--mono-font); }

@@ -614,25 +614,31 @@ function renderResultsCharts(c) {
 
 /* renderGeo fills the "Top Sources" list and the map footer from the bubbles
  * (one per origin IP, with an event count) built in updateMap. */
-function renderGeo() {
-    var sorted = bubbles.slice().sort(function (a, b) { return b.count - a.count }).slice(0, 6)
+function renderGeo(sources) {
+    sources = sources || bubbles
+    var sorted = sources.slice().sort(function (a, b) { return b.count - a.count }).slice(0, 6)
     var max = sorted.length ? sorted[0].count : 1
     var html = ''
     $.each(sorted, function (i, b) {
-        html += '<div class="gi"><span class="gn">' + escapeHtml(b.ip) + '</span>' +
+        // Flag sources that could not be placed on the map (internal/proxied IPs)
+        var flag = (b.located === false)
+            ? ' <i class="fa fa-question-circle" data-toggle="tooltip" title="Could not be geolocated \u2014 internal or proxied address"></i>'
+            : ''
+        html += '<div class="gi"><span class="gn">' + escapeHtml(b.ip) + flag + '</span>' +
             '<span class="gbar"><i style="width:' + ((b.count / max) * 100) + '%"></i></span>' +
             '<span class="gv">' + b.count + '</span></div>'
     })
     if (!html) {
-        html = '<div class="mono" style="color:var(--ink-faint);font-size:12px;">No geolocated events yet</div>'
+        html = '<div class="mono" style="color:var(--ink-faint);font-size:12px;">No connecting IPs recorded yet</div>'
     }
     $("#geoList").html(html)
 
-    var totalEvents = 0
-    $.each(bubbles, function (i, b) { totalEvents += b.count })
-    $("#geoFooter").text(
-        totalEvents.toLocaleString() + " geolocated event" + (totalEvents == 1 ? "" : "s") +
-        " \u00B7 " + bubbles.length + " source" + (bubbles.length == 1 ? "" : "s"))
+    var totalEvents = 0, ungeo = 0
+    $.each(sources, function (i, b) { totalEvents += b.count; if (b.located === false) ungeo += b.count })
+    var footer = totalEvents.toLocaleString() + " event" + (totalEvents == 1 ? "" : "s") +
+        " \u00B7 " + sources.length + " source" + (sources.length == 1 ? "" : "s")
+    if (ungeo > 0) { footer += " \u00B7 " + ungeo + " not geolocated" }
+    $("#geoFooter").text(footer)
 }
 
 /* Updates the bubbles on the map
@@ -640,36 +646,44 @@ function renderGeo() {
 @param {campaign.result[]} results - The campaign results to process
 */
 var updateMap = function (results) {
-    bubbles = []
+    // Aggregate every connecting IP into a "source" (one per unique IP, with an
+    // event count). Internal or proxied addresses have no coordinates and can't
+    // be plotted, but they still belong in the "Top Sources" list.
+    var sources = []
     $.each(campaign.results, function (i, result) {
-        // Check that it wasn't an internal IP
-        if (result.latitude == 0 && result.longitude == 0) {
+        if (!result.ip) {
             return true;
         }
-        newIP = true
-        $.each(bubbles, function (i, bubble) {
-            if (bubble.ip == result.ip) {
-                bubbles[i].radius += 1
-                bubbles[i].count += 1
+        var newIP = true
+        $.each(sources, function (i, source) {
+            if (source.ip == result.ip) {
+                sources[i].radius += 1
+                sources[i].count += 1
                 newIP = false
                 return false
             }
         })
         if (newIP) {
-            bubbles.push({
+            sources.push({
                 latitude: result.latitude,
                 longitude: result.longitude,
                 name: result.ip,
                 ip: result.ip,
                 count: 1,
                 fillKey: "point",
-                radius: 2
+                radius: 2,
+                located: !(result.latitude == 0 && result.longitude == 0)
             })
         }
     })
+    // Only geolocated sources can be drawn on the map.
+    bubbles = sources.filter(function (s) { return s.located })
     // Mark each origin on the map and show the IP address (and how many
-    // recipients connected from it) when hovering the bubble.
+    // recipients connected from it) when hovering the bubble. Resize first so
+    // bubbles are positioned against the container's current width (datamaps
+    // computes bubble coordinates from the projection at call time).
     if (map) {
+        if (map.resize) map.resize()
         map.bubbles(bubbles, {
             popupTemplate: function (geo, data) {
                 return '<div class="hoverinfo">' +
@@ -679,9 +693,9 @@ var updateMap = function (results) {
             }
         })
     }
-    // The "Top Sources" list and footer work from the same data, so they
-    // render even when the visual map is disabled.
-    renderGeo()
+    // The "Top Sources" list and footer show every source IP (geolocated or
+    // not), so they render even when the visual map is disabled.
+    renderGeo(sources)
 }
 
 /**
@@ -870,9 +884,13 @@ function load() {
                     }
                 });
                 // Datamaps measures width on creation; if the container was
-                // hidden it can render at 0px. Force a resize once visible.
-                setTimeout(function () { if (map && map.resize) map.resize(); }, 50)
-                updateMap(campaign.results)
+                // hidden/not yet laid out it renders at 0px, which would place
+                // the bubbles off-screen. Resize once the panel has real
+                // dimensions, THEN plot the bubbles so they land correctly.
+                setTimeout(function () {
+                    if (map && map.resize) map.resize();
+                    updateMap(campaign.results)
+                }, 50)
             }
         })
         .error(function () {

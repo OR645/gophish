@@ -1,10 +1,8 @@
 {{define "body"}}
 <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
-    <h1 class="page-header">
-        Landing Pages
-    </h1>
-    <div id="flashes" class="row"></div>
-    <div class="soc-between" style="margin-bottom:18px;">
+  <div class="canvas-inner stack fade-up">
+    <div id="flashes"></div>
+    <div class="soc-between">
         <div class="soc-section-title" id="pageCount">Landing Pages</div>
         <button type="button" class="btn btn-primary" onclick="edit(-1)" data-toggle="modal" data-backdrop="static"
             data-target="#modal"><i class="fa fa-plus"></i>&nbsp;New Page</button>
@@ -17,7 +15,8 @@
             No pages created yet. Let's create one!
         </div>
     </div>
-    <div id="pagesGrid" class="card-grid fade-up" style="display:none;"></div>
+    <div id="pagesGrid" class="card-grid" style="display:none;"></div>
+  </div>
 </div>
 <!-- Modal -->
 <div class="modal fade" id="modal" tabindex="-1" role="dialog" aria-labelledby="modalLabel">
