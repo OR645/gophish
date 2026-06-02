@@ -1,5 +1,78 @@
 var groups = []
 
+// ---- SOC-redesign master-detail helpers -----------------------------------
+// KPI row above the groups/members split.
+function renderGroupKpis(groups) {
+    var totalTargets = 0, lastImport = 0
+    groups.forEach(function (g) {
+        totalTargets += g.num_targets || 0
+        var t = new Date(g.modified_date).getTime()
+        if (t > lastImport) lastImport = t
+    })
+    var kpis = [
+        { label: "Total Targets", icon: "fa-users", value: totalTargets.toLocaleString() },
+        { label: "Groups", icon: "fa-th-large", value: groups.length },
+        { label: "Last Updated", icon: "fa-calendar", value: lastImport ? moment(lastImport).format("MMM D") : "—", small: true }
+    ]
+    document.getElementById("groupKpis").innerHTML = kpis.map(function (k) {
+        return '<div class="kpi"><div class="label"><span class="ic"><i class="fa ' + k.icon + '"></i></span>' + k.label + '</div>' +
+            '<div class="value"' + (k.small ? ' style="font-size:22px"' : '') + '>' + k.value + '</div></div>'
+    }).join("")
+}
+
+// One <tr> for the groups list (DOM-sourced DataTable; data-order drives sort).
+function groupRowHtml(group) {
+    var epoch = new Date(group.modified_date).getTime() || 0
+    var updated = moment(group.modified_date).format('MMM Do YYYY, h:mm a')
+    return '<tr style="cursor:pointer" data-group-id="' + group.id + '" data-group-name="' + escapeHtml(group.name) + '">' +
+        '<td class="strong">' + escapeHtml(group.name) + '<div class="mono" style="font-size:10.5px;color:var(--ink-faint);font-weight:400;">GRP-' + group.id + '</div></td>' +
+        '<td class="num strong" data-order="' + (group.num_targets || 0) + '">' + (group.num_targets || 0) + '</td>' +
+        '<td class="num" data-order="' + epoch + '">' + updated + '</td>' +
+        '<td class="no-sort"><div style="display:flex;gap:6px;justify-content:flex-end;">' +
+        '<button class="icon-btn" style="width:30px;height:30px;" data-toggle="modal" data-backdrop="static" data-target="#modal" onclick="edit(' + group.id + ')" title="Edit Group"><i class="fa fa-pencil"></i></button>' +
+        '<button class="icon-btn" style="width:30px;height:30px;color:var(--c-submitted);" onclick="deleteGroup(' + group.id + ')" title="Delete Group"><i class="fa fa-trash-o"></i></button>' +
+        '</div></td>' +
+        '</tr>'
+}
+
+// Load + render the members of the selected group into the right panel.
+function loadMembers(id, name) {
+    $("#groupTable tbody tr").removeClass("row-selected")
+    $('#groupTable tbody tr[data-group-id="' + id + '"]').addClass("row-selected")
+    $("#memberGroupName").text(name)
+    $("#memberCount").text("loading…")
+    $("#memberEmpty").hide()
+    $("#memberEditBtn").show().off("click").on("click", function () {
+        edit(id)
+        $("#modal").modal("show")
+    })
+    api.groupId.get(id)
+        .success(function (group) {
+            var targets = group.targets || []
+            $("#memberCount").text(targets.length + (targets.length === 1 ? " member" : " members"))
+            if (!targets.length) {
+                $("#memberTbody").html("")
+                $("#memberEmpty").text("No members in this group yet.").show()
+                return
+            }
+            $("#memberTbody").html(targets.map(function (t) {
+                var full = ((t.first_name || "") + " " + (t.last_name || "")).trim() || t.email
+                var initials = (((t.first_name || " ")[0] || "") + ((t.last_name || " ")[0] || "")).trim().toUpperCase() ||
+                    ((t.email || "?")[0] || "?").toUpperCase()
+                return '<tr><td class="strong"><div class="soc-row" style="gap:10px;">' +
+                    '<span class="avatar" style="width:28px;height:28px;font-size:11px;border-radius:7px;">' + escapeHtml(initials) + '</span>' +
+                    '<div>' + escapeHtml(full) + '<div class="mono" style="font-size:10.5px;color:var(--ink-faint);font-weight:400;">' + escapeHtml(t.email) + '</div></div>' +
+                    '</div></td>' +
+                    '<td>' + (t.position ? escapeHtml(t.position) : '<span class="muted">—</span>') + '</td></tr>'
+            }).join(""))
+        })
+        .error(function () {
+            $("#memberCount").text("")
+            $("#memberTbody").html("")
+            $("#memberEmpty").text("Error loading members.").show()
+        })
+}
+
 // Save attempts to POST or PUT to /groups/
 function save(id) {
     var targets = []
@@ -226,32 +299,29 @@ function load() {
             if (response.total > 0) {
                 groups = response.groups
                 $("#emptyMessage").hide()
+                renderGroupKpis(groups)
+                // Source the DataTable from the DOM so per-cell data-order
+                // attributes drive correct numeric / date sorting.
+                $("#groupTable tbody").html(groups.map(groupRowHtml).join(""))
                 $("#groupTable").show()
-                var groupTable = $("#groupTable").DataTable({
+                $("#groupTable").DataTable({
                     destroy: true,
-                    columnDefs: [{
-                        orderable: false,
-                        targets: "no-sort"
-                    }]
-                });
-                groupTable.clear();
-                groupRows = []
-                $.each(groups, function (i, group) {
-                    groupRows.push([
-                        escapeHtml(group.name),
-                        escapeHtml(group.num_targets),
-                        moment(group.modified_date).format('MMMM Do YYYY, h:mm:ss a'),
-                        "<div class='pull-right'><button class='btn btn-primary' data-toggle='modal' data-backdrop='static' data-target='#modal' onclick='edit(" + group.id + ")'>\
-                    <i class='fa fa-pencil'></i>\
-                    </button>\
-                    <button class='btn btn-danger' onclick='deleteGroup(" + group.id + ")'>\
-                    <i class='fa fa-trash-o'></i>\
-                    </button></div>"
-                    ])
+                    columnDefs: [{ orderable: false, targets: "no-sort" }],
+                    order: [[2, "desc"]]
                 })
-                groupTable.rows.add(groupRows).draw()
+                // Auto-select the most recently updated group for the detail pane.
+                var first = groups.slice().sort(function (a, b) {
+                    return new Date(b.modified_date) - new Date(a.modified_date)
+                })[0]
+                if (first) { loadMembers(first.id, first.name) }
             } else {
                 $("#emptyMessage").show()
+                $("#groupTable").hide()
+                $("#memberGroupName").text("Members")
+                $("#memberCount").text("")
+                $("#memberTbody").html("")
+                $("#memberEditBtn").hide()
+                $("#memberEmpty").text("No groups yet — create one to add members.").show()
             }
         })
         .error(function () {
@@ -293,4 +363,12 @@ $(document).ready(function () {
         dismiss();
     });
     $("#csv-template").click(downloadCSVTemplate)
+    // Master-detail: click a group row (but not its action buttons) to load
+    // its members into the right-hand panel.
+    $("#groupTable tbody").on("click", "tr", function (e) {
+        if ($(e.target).closest("button,a").length) { return }
+        var id = $(this).data("group-id")
+        var name = $(this).data("group-name")
+        if (id != null && id !== "") { loadMembers(id, name) }
+    })
 });

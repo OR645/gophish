@@ -290,6 +290,9 @@ hr { border-color: var(--border-soft); }
 .table > tbody > tr { transition: background .12s; }
 .table-hover > tbody > tr:hover, .table > tbody > tr:hover { background: var(--hover) !important; }
 .table.dataTable { border-collapse: collapse !important; }
+/* selected row (master-detail lists, e.g. Users & Groups) */
+.table tbody tr.row-selected, .table tbody tr.row-selected:hover,
+.table > tbody > tr.row-selected, .table > tbody > tr.row-selected:hover { background: var(--accent-soft) !important; }
 
 /* forms */
 .form-control, .input, textarea, select.form-control {

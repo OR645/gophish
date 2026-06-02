@@ -1,34 +1,51 @@
 {{define "body"}}
 <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
-  <div class="canvas-inner fade-up">
+  <div class="canvas-inner stack fade-up">
     <div id="flashes"></div>
-    <div class="soc-between" style="margin-bottom:18px;">
-        <div class="soc-section-title">Users &amp; Groups</div>
-        <button type="button" class="btn btn-primary" onclick="edit(-1)" data-toggle="modal" data-backdrop="static"
-            data-target="#modal">
-            <i class="fa fa-plus"></i>&nbsp;New Group</button>
-    </div>
-    <div id="loading">
-        <i class="fa fa-spinner fa-spin fa-4x"></i>
-    </div>
-    <div id="emptyMessage" style="display:none;">
-        <div class="alert alert-info">
-            No groups created yet. Let's create one!
+    <div class="soc-grid-3" id="groupKpis"></div>
+    <div class="soc-split">
+        <div class="panel">
+            <div class="panel-head">
+                <div><h3>Groups</h3><div class="sub">target population</div></div>
+                <div class="head-actions">
+                    <button type="button" class="btn btn-sm btn-primary" onclick="edit(-1)" data-toggle="modal"
+                        data-backdrop="static" data-target="#modal"><i class="fa fa-plus"></i>&nbsp;New Group</button>
+                </div>
+            </div>
+            <div id="loading"><i class="fa fa-spinner fa-spin fa-4x"></i></div>
+            <div id="emptyMessage" style="display:none;">
+                <div class="alert alert-info" style="margin:14px;">No groups created yet. Let's create one!</div>
+            </div>
+            <div class="table-panel">
+                <table id="groupTable" class="table" style="display:none;">
+                    <thead>
+                        <tr>
+                            <th>Group</th>
+                            <th>Members</th>
+                            <th>Updated</th>
+                            <th class="no-sort"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
         </div>
-    </div>
-    <div class="panel table-panel">
-        <table id="groupTable" class="table" style="display:none;">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th># of Members</th>
-                    <th>Modified Date</th>
-                    <th class="col-md-2 no-sort"></th>
-                </tr>
-            </thead>
-            <tbody>
-            </tbody>
-        </table>
+        <div class="panel">
+            <div class="panel-head">
+                <div><h3 id="memberGroupName">Members</h3><div class="sub" id="memberCount"></div></div>
+                <div class="head-actions">
+                    <button type="button" class="btn btn-sm" id="memberEditBtn" style="display:none;"><i class="fa fa-pencil"></i>&nbsp;Edit</button>
+                </div>
+            </div>
+            <div class="table-panel">
+                <table class="table">
+                    <thead><tr><th>Member</th><th>Position</th></tr></thead>
+                    <tbody id="memberTbody"></tbody>
+                </table>
+            </div>
+            <div id="memberEmpty" class="panel-body" style="color:var(--ink-faint);font-family:var(--mono-font);font-size:12px;">Select a group to view its members.</div>
+        </div>
     </div>
   </div>
 </div>
