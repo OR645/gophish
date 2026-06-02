@@ -85,6 +85,16 @@ var deletePage = function (idx) {
     })
 }
 
+// preview renders the selected landing page's HTML inside a sandboxed
+// iframe so the user can see the rendered result without editing it.
+function preview(idx) {
+    var page = pages[idx]
+    $("#previewModalLabel").text(page.name)
+    var frame = document.getElementById("previewFrame")
+    var html = page.html || "<div style='font-family:sans-serif;color:#888;padding:24px'>This landing page has no HTML content.</div>"
+    frame.srcdoc = html
+}
+
 function importSite() {
     url = $("#url").val()
     if (!url) {
@@ -165,7 +175,10 @@ function load() {
                     pageRows.push([
                         escapeHtml(page.name),
                         moment(page.modified_date).format('MMMM Do YYYY, h:mm:ss a'),
-                        "<div class='pull-right'><span data-toggle='modal' data-backdrop='static' data-target='#modal'><button class='btn btn-primary' data-toggle='tooltip' data-placement='left' title='Edit Page' onclick='edit(" + i + ")'>\
+                        "<div class='pull-right'><span data-toggle='modal' data-backdrop='static' data-target='#previewModal'><button class='btn btn-primary' data-toggle='tooltip' data-placement='left' title='Preview Page' onclick='preview(" + i + ")'>\
+                    <i class='fa fa-eye'></i>\
+                    </button></span>\
+                    <span data-toggle='modal' data-backdrop='static' data-target='#modal'><button class='btn btn-primary' data-toggle='tooltip' data-placement='left' title='Edit Page' onclick='edit(" + i + ")'>\
                     <i class='fa fa-pencil'></i>\
                     </button></span>\
 		    <span data-toggle='modal' data-target='#modal'><button class='btn btn-primary' data-toggle='tooltip' data-placement='left' title='Copy Page' onclick='copy(" + i + ")'>\

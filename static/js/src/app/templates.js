@@ -279,6 +279,20 @@ function copy(idx) {
     }
 }
 
+// preview renders the selected template's HTML inside a sandboxed
+// iframe so the user can see the rendered result without editing it.
+function preview(idx) {
+    var template = templates[idx]
+    $("#previewModalLabel").text(template.name)
+    $("#previewSubject").text(template.subject || "(No subject)")
+    var frame = document.getElementById("previewFrame")
+    var html = template.html || "<div style='font-family:sans-serif;color:#888;padding:24px'>This template has no HTML content.</div>"
+    frame.srcdoc = html
+    $("#previewText").text(template.text || "(No plaintext content)")
+    // Default to the HTML tab each time the preview opens
+    $('#previewTabs a[href="#preview_html"]').tab('show')
+}
+
 function importEmail() {
     raw = $("#email_content").val()
     convert_links = $("#convert_links_checkbox").prop("checked")
@@ -329,7 +343,10 @@ function load() {
                     templateRows.push([
                         escapeHtml(template.name),
                         moment(template.modified_date).format('MMMM Do YYYY, h:mm:ss a'),
-                        "<div class='pull-right'><span data-toggle='modal' data-backdrop='static' data-target='#modal'><button class='btn btn-primary' data-toggle='tooltip' data-placement='left' title='Edit Template' onclick='edit(" + i + ")'>\
+                        "<div class='pull-right'><span data-toggle='modal' data-backdrop='static' data-target='#previewModal'><button class='btn btn-primary' data-toggle='tooltip' data-placement='left' title='Preview Template' onclick='preview(" + i + ")'>\
+                    <i class='fa fa-eye'></i>\
+                    </button></span>\
+                    <span data-toggle='modal' data-backdrop='static' data-target='#modal'><button class='btn btn-primary' data-toggle='tooltip' data-placement='left' title='Edit Template' onclick='edit(" + i + ")'>\
                     <i class='fa fa-pencil'></i>\
                     </button></span>\
 		    <span data-toggle='modal' data-target='#modal'><button class='btn btn-primary' data-toggle='tooltip' data-placement='left' title='Copy Template' onclick='copy(" + i + ")'>\
