@@ -32,15 +32,6 @@
         </ul>
     </div>
     <div class="sidebar-foot">
-        <div class="health">
-            <div class="health-top">
-                <span class="lbl">SYSTEM HEALTH</span>
-                <span class="pill pill-reported"><span class="dot"></span>OK</span>
-            </div>
-            <div class="bars">
-                <i></i><i></i><i></i><i></i><i></i><i></i><i class="warn"></i><i></i><i></i><i></i><i></i><i></i>
-            </div>
-        </div>
         {{if .User}}
         <a class="user-chip" href="/logout" title="Sign out">
             <span class="avatar" id="userAvatar">{{.User.Username}}</span>
