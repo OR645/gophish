@@ -171,45 +171,8 @@
         });
     }
 
-    // ---- dashboard KPI cards (computed from the campaigns summary) ----
-    // Purely additive: injects a prototype-style KPI row at the top of the
-    // dashboard. Any failure is swallowed so the page is never affected.
-    function setupDashboardKPIs() {
-        if (location.pathname !== "/") return;
-        var host = document.getElementById("dashboard");
-        if (!host || document.getElementById("socKpiGrid")) return;
-        var req = fetchJSON("/campaigns/summary");
-        if (!req) return;
-        req.done(function (data) {
-            try {
-                var cs = (data && data.campaigns) || [];
-                var running = 0, sent = 0, clicked = 0, recipients = 0;
-                cs.forEach(function (c) {
-                    var st = c.stats || {};
-                    sent += st.sent || 0;
-                    clicked += st.clicked || 0;
-                    recipients += st.total || 0;
-                    if (c.status && c.status !== "Completed") running++;
-                });
-                var clickRate = sent ? Math.round((clicked / sent) * 1000) / 10 : 0;
-                var kpis = [
-                    { label: "Total Campaigns", icon: "fa-bullseye", value: cs.length },
-                    { label: "Running Now", icon: "fa-bolt", value: running, accent: true },
-                    { label: "Recipients", icon: "fa-users", value: recipients.toLocaleString() },
-                    { label: "Avg Click Rate", icon: "fa-mouse-pointer", value: clickRate, suffix: "%" }
-                ];
-                var grid = document.createElement("div");
-                grid.id = "socKpiGrid";
-                grid.className = "kpi-grid";
-                grid.style.marginBottom = "14px";
-                grid.innerHTML = kpis.map(function (k) {
-                    return '<div class="kpi"><div class="label"><span class="ic"><i class="fa ' + k.icon + '"></i></span>' + k.label + '</div>' +
-                        '<div class="value"' + (k.accent ? ' style="color:var(--accent)"' : '') + '>' + k.value + (k.suffix ? '<small>' + k.suffix + '</small>' : '') + '</div></div>';
-                }).join("");
-                host.insertBefore(grid, host.firstChild);
-            } catch (e) { /* never break the dashboard */ }
-        });
-    }
+    // Note: the dashboard KPI row + funnel/feed/engagement widgets are owned by
+    // dashboard.js (it has the real campaign data); soc.js no longer injects KPIs.
 
     function init() {
         setupTheme();
@@ -217,7 +180,6 @@
         setupSearch();
         setupAvatar();
         setupCounts();
-        setupDashboardKPIs();
     }
 
     if (document.readyState === "loading") {

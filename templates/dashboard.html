@@ -7,65 +7,77 @@
     {{template "flashes" .Flashes}}
     <div id="emptyMessage" style="display:none;">
         <div class="alert alert-info">
-            No campaigns created yet. Let's create one!
+            No campaigns created yet. <a href="/campaigns">Let's create one!</a>
         </div>
     </div>
-    <div id="dashboard" style="display:none;" class="soc-stack">
-        <div class="panel">
-            <div class="panel-head">
-                <h3>Phishing Success Overview</h3>
-                <span class="sub">% of success across campaigns</span>
-            </div>
-            <div class="panel-body">
-                <div id="overview_chart" style="height:240px;"></div>
-            </div>
-        </div>
-        <div class="panel">
-            <div class="panel-head"><h3>Conversion Breakdown</h3></div>
-            <div class="panel-body">
-                <div class="soc-row" style="justify-content:space-around;flex-wrap:wrap;gap:10px;">
-                    <div id="sent_chart" style="height:200px;flex:1 1 150px;"></div>
-                    <div id="opened_chart" style="height:200px;flex:1 1 150px;"></div>
-                    <div id="clicked_chart" style="height:200px;flex:1 1 150px;"></div>
-                    <div id="submitted_data_chart" style="height:200px;flex:1 1 150px;"></div>
-                    <div id="email_reported_chart" style="height:200px;flex:1 1 150px;"></div>
+    <div id="dashboard" style="display:none;" class="stack">
+        <!-- KPI row -->
+        <div class="kpi-grid" id="kpiGrid"></div>
+
+        <!-- Phishing funnel + live activity -->
+        <div class="soc-split">
+            <div class="panel">
+                <div class="panel-head">
+                    <div><h3>Phishing Funnel</h3><div class="sub">all campaigns · aggregate</div></div>
+                    <div class="head-actions"><span class="tag" id="funnelTargets"></span></div>
+                </div>
+                <div class="panel-body">
+                    <div class="funnel" id="funnel"></div>
+                    <div class="legend" id="funnelLegend" style="margin-top:18px;"></div>
                 </div>
             </div>
-        </div>
-        <div class="panel table-panel">
-            <div class="panel-head">
-                <h3>Recent Campaigns</h3>
-                <div class="head-actions">
-                    <a href="/campaigns" class="btn btn-sm btn-default">View All</a>
+            <div class="panel" style="display:flex;flex-direction:column;">
+                <div class="panel-head">
+                    <div><h3>Live Activity</h3></div>
+                    <div class="head-actions"><span class="pill pill-active"><span class="dot"></span>Live</span></div>
                 </div>
+                <div class="panel-body feed" id="liveFeed" style="padding-top:6px;padding-bottom:6px;overflow-y:auto;max-height:290px;"></div>
             </div>
-            <table id="campaignTable" class="table">
-                <thead>
-                    <tr>
-                        <th class="col-md-2 col-sm-2">Name</th>
-                        <th class="col-md-2 col-sm-2">Created Date</th>
-                        <th class="col-md-1 col-sm-1">
-                            <i class="fa fa-envelope-o"></i>
-                        </th>
-                        <th class="col-md-1 col-sm-1">
-                            <i class="fa fa-envelope-open-o"></i>
-                        </th>
-                        <th class="col-md-1 col-sm-1">
-                            <i class="fa fa-mouse-pointer"></i>
-                        </th>
-                        <th class="col-md-1 col-sm-1">
-                            <i class="fa fa-exclamation-circle"></i>
-                        </th>
-                        <th class="col-md-1 col-sm-1">
-                            <i class="fa fa-bullhorn"></i>
-                        </th>
-                        <th class="col-md-1 col-sm-1">Status</th>
-                        <th class="col-md-2 col-sm-2 no-sort"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                </tbody>
-            </table>
+        </div>
+
+        <!-- Engagement over time + risk by campaign -->
+        <div class="soc-split">
+            <div class="panel">
+                <div class="panel-head">
+                    <div><h3>Engagement Over Time</h3><div class="sub">opened · clicked · reported</div></div>
+                    <div class="head-actions">
+                        <div class="legend" style="gap:14px;">
+                            <div class="li" style="font-size:11px;"><span class="sw" style="background:var(--c-opened)"></span>Opened</div>
+                            <div class="li" style="font-size:11px;"><span class="sw" style="background:var(--c-clicked)"></span>Clicked</div>
+                            <div class="li" style="font-size:11px;"><span class="sw" style="background:var(--c-reported)"></span>Reported</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="panel-body" id="engagementChart"></div>
+            </div>
+            <div class="panel">
+                <div class="panel-head"><div><h3>Risk by Campaign</h3><div class="sub">submission rate</div></div></div>
+                <div class="panel-body stack" id="riskList" style="gap:13px;"></div>
+            </div>
+        </div>
+
+        <!-- Recent campaigns -->
+        <div class="panel">
+            <div class="panel-head">
+                <div><h3>Recent Campaigns</h3></div>
+                <div class="head-actions"><a href="/campaigns" class="btn btn-sm btn-default">View All</a></div>
+            </div>
+            <div class="table-panel">
+                <table class="table" id="recentTable">
+                    <thead>
+                        <tr>
+                            <th>Campaign</th>
+                            <th>Status</th>
+                            <th>Launched</th>
+                            <th>Sent</th>
+                            <th>Funnel</th>
+                            <th>Click Rate</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
         </div>
     </div>
   </div>

@@ -558,6 +558,12 @@ function renderHeader(c) {
 
 /* renderResultsCharts draws the conversion funnel and the outcome donut from
  * the live campaign data. Called on initial load and on every poll. */
+/* formatPct — one decimal place, but drop a trailing ".0" so whole numbers
+ * (notably 0 and 100) render as "0%" / "100%" rather than "0.0%" / "100.0%". */
+function formatPct(value) {
+    return parseFloat((value || 0).toFixed(1)).toString()
+}
+
 function renderResultsCharts(c) {
     var recipients = (c.results || []).length
     var f = computeFunnel(c)
@@ -596,7 +602,7 @@ function renderResultsCharts(c) {
         { value: clickedOnly, color: "var(--c-clicked)" },
         { value: openedOnly, color: "var(--c-opened)" },
         { value: notOpened, color: "var(--c-sent)" }
-    ], compromised.toFixed(1) + "%", "COMPROMISED"))
+    ], formatPct(compromised) + "%", "COMPROMISED"))
 
     var legend = [
         ["Submitted", submitted, "var(--c-submitted)"],
