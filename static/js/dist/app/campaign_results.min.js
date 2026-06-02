@@ -1,5 +1,8 @@
 var map = null
 var doPoll = true;
+// selected tracks which result IDs (RIds) are checked for bulk actions. It's
+// kept outside the datatable so selections survive the periodic redraw/poll.
+var selected = {}
 
 // statuses is a helper map to point result statuses to ui classes
 var statuses = {
@@ -821,8 +824,34 @@ function load() {
                                 return reported
                             },
                             "targets": [7]
+                        },
+                        {
+                            // Per-row bulk-select checkbox
+                            orderable: false,
+                            className: "text-center",
+                            "render": function (data, type, row) {
+                                return "<input type='checkbox' class='result-select' data-rid='" + row[0] + "'>"
+                            },
+                            "targets": [9]
+                        },
+                        {
+                            // Per-row "resend email" action
+                            orderable: false,
+                            className: "text-center",
+                            "render": function (data, type, row) {
+                                return "<button class='btn btn-xs btn-default' data-toggle='tooltip' title='Resend email to this recipient' onclick='resendResult(\"" + row[0] + "\")'><i class='fa fa-paper-plane'></i></button>"
+                            },
+                            "targets": [10]
                         }
-                    ]
+                    ],
+                    // Restore checkbox state after every (re)draw so selections
+                    // aren't lost when the table is redrawn by the poll loop.
+                    "drawCallback": function () {
+                        $("#resultsTable tbody .result-select").each(function () {
+                            $(this).prop("checked", !!selected[$(this).attr("data-rid")])
+                        })
+                        updateBulkButton()
+                    }
                 });
                 resultsTable.clear();
                 $.each(campaign.results, function (i, result) {
@@ -835,7 +864,9 @@ function load() {
                         escapeHtml(result.position) || "",
                         result.status,
                         result.reported,
-                        moment(result.send_date).format('MMMM Do YYYY, h:mm:ss a')
+                        moment(result.send_date).format('MMMM Do YYYY, h:mm:ss a'),
+                        "", // [9] bulk-select checkbox (rendered from row[0])
+                        ""  // [10] resend action (rendered from row[0])
                     ])
                 })
                 resultsTable.draw();
@@ -859,6 +890,20 @@ function load() {
                         tr.addClass('shown');
                     }
                 });
+                // Bulk-select handling: track per-row checkboxes and the
+                // "select all" header checkbox for the resend bulk action.
+                $('#resultsTable tbody').on('change', '.result-select', function () {
+                    selected[$(this).attr("data-rid")] = $(this).prop("checked")
+                    updateBulkButton()
+                })
+                $('#select-all').on('change', function () {
+                    var checked = $(this).prop("checked")
+                    $('#resultsTable tbody .result-select').each(function () {
+                        selected[$(this).attr("data-rid")] = checked
+                        $(this).prop("checked", checked)
+                    })
+                    updateBulkButton()
+                })
                 // Draw the conversion funnel and outcome donut
                 renderResultsCharts(campaign)
 
@@ -908,6 +953,95 @@ function refresh() {
     clearTimeout(setRefresh)
     setRefresh = setTimeout(refresh, 60000)
 };
+
+// selectedRids returns the list of result IDs currently checked for bulk actions
+function selectedRids() {
+    return Object.keys(selected).filter(function (rid) {
+        return selected[rid]
+    })
+}
+
+// updateBulkButton shows/hides the "Resend Selected" button and updates its count
+function updateBulkButton() {
+    var count = selectedRids().length
+    $("#bulk_resend_count").text(count)
+    if (count > 0) {
+        $("#bulk_resend_button").show()
+    } else {
+        $("#bulk_resend_button").hide()
+    }
+}
+
+// resendResult resends the phishing email to a single recipient
+function resendResult(rid) {
+    Swal.fire({
+        title: "Resend email?",
+        text: "A new phishing email will be sent to this recipient (RID: " + rid + ").",
+        type: "question",
+        animation: false,
+        showCancelButton: true,
+        confirmButtonText: "Resend",
+        confirmButtonColor: "#428bca",
+        reverseButtons: true,
+        allowOutsideClick: false,
+        showLoaderOnConfirm: true,
+        preConfirm: function () {
+            return new Promise(function (resolve, reject) {
+                api.campaignId.resend(campaign.id, rid)
+                    .success(function (msg) {
+                        resolve(msg)
+                    })
+                    .error(function (data) {
+                        reject(data.responseJSON.message)
+                    })
+            })
+        }
+    }).then(function (result) {
+        if (result.value) {
+            Swal.fire('Email Queued!', 'The email has been queued to be resent.', 'success')
+            refresh()
+        }
+    })
+}
+
+// resendSelected resends the phishing email to all checked recipients
+function resendSelected() {
+    var rids = selectedRids()
+    if (!rids.length) {
+        return
+    }
+    Swal.fire({
+        title: "Resend " + rids.length + " email(s)?",
+        text: "A new phishing email will be sent to each selected recipient.",
+        type: "question",
+        animation: false,
+        showCancelButton: true,
+        confirmButtonText: "Resend",
+        confirmButtonColor: "#428bca",
+        reverseButtons: true,
+        allowOutsideClick: false,
+        showLoaderOnConfirm: true,
+        preConfirm: function () {
+            return new Promise(function (resolve, reject) {
+                api.campaignId.resendBulk(campaign.id, rids)
+                    .success(function (msg) {
+                        resolve(msg)
+                    })
+                    .error(function (data) {
+                        reject(data.responseJSON.message)
+                    })
+            })
+        }
+    }).then(function (result) {
+        if (result.value) {
+            selected = {}
+            $('#select-all').prop("checked", false)
+            updateBulkButton()
+            Swal.fire('Emails Queued!', (result.value && result.value.message) || 'The selected emails have been queued to be resent.', 'success')
+            refresh()
+        }
+    })
+}
 
 function report_mail(rid, cid) {
     Swal.fire({

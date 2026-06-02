@@ -56,6 +56,43 @@ func GenerateMailLog(c *Campaign, r *Result, sendDate time.Time) error {
 	return db.Save(m).Error
 }
 
+// GenerateResendMailLog prepares the given result to be re-sent. Any existing
+// maillog for the result is removed (to avoid duplicate sends), the result's
+// status is reset to "Scheduled" so the UI reflects the pending resend, and a
+// fresh maillog is created scheduled to send immediately.
+//
+// The returned maillog is locked (Processing = true) so that the background
+// scheduler won't dispatch it in parallel. The caller is responsible for
+// queueing it to the mailer (which unlocks/deletes it once handled).
+func GenerateResendMailLog(c *Campaign, r *Result) (*MailLog, error) {
+	// Remove any existing maillog for this result to avoid sending twice.
+	err := db.Where("r_id = ?", r.RId).Delete(&MailLog{}).Error
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now().UTC()
+	// Reset the result so its status and timeline reflect the queued resend.
+	r.Status = StatusScheduled
+	r.SendDate = now
+	r.ModifiedDate = now
+	err = db.Save(r).Error
+	if err != nil {
+		return nil, err
+	}
+	m := &MailLog{
+		UserId:     c.UserId,
+		CampaignId: c.Id,
+		RId:        r.RId,
+		SendDate:   now,
+		Processing: true,
+	}
+	err = db.Save(m).Error
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // Backoff sets the MailLog SendDate to be the next entry in an exponential
 // backoff. ErrMaxRetriesExceeded is thrown if this maillog has been retried
 // too many times. Backoff also unlocks the maillog so that it can be processed

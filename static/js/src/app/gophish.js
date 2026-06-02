@@ -107,6 +107,16 @@ var api = {
         // summary() - Queries the API for GET /campaigns/summary
         summary: function (id) {
             return query("/campaigns/" + id + "/summary", "GET", {}, true)
+        },
+        // resend() - Resends the email to a single recipient at
+        // POST /campaigns/:id/results/:rid/resend
+        resend: function (id, rid) {
+            return query("/campaigns/" + id + "/results/" + rid + "/resend", "POST", {}, true)
+        },
+        // resendBulk() - Resends the email to multiple recipients at
+        // POST /campaigns/:id/results/resend
+        resendBulk: function (id, rids) {
+            return query("/campaigns/" + id + "/results/resend", "POST", { ids: rids }, true)
         }
     },
     // groups contains the endpoints for /groups

@@ -28,6 +28,9 @@
                 <button id="refresh_btn" type="button" class="btn btn-sm btn-default" data-toggle="tooltip" onclick="refresh()">
                     <i class="fa fa-refresh"></i> Refresh
                 </button>
+                <button id="bulk_resend_button" type="button" class="btn btn-sm btn-warning" style="display:none;" data-toggle="tooltip" title="Resend the email to the selected recipients" onclick="resendSelected()">
+                    <i class="fa fa-paper-plane"></i> Resend Selected (<span id="bulk_resend_count">0</span>)
+                </button>
                 <button id="complete_button" type="button" class="btn btn-sm btn-primary" data-toggle="tooltip" onclick="completeCampaign()">
                     <i class="fa fa-flag-checkered"></i> Complete
                 </button>
@@ -100,6 +103,9 @@
                         <th>Position</th>
                         <th>Status</th>
                         <th class="text-center">Reported</th>
+                        <th class="no-sort"></th>
+                        <th class="no-sort text-center"><input type="checkbox" id="select-all" data-toggle="tooltip" title="Select all"></th>
+                        <th class="no-sort text-center">Resend</th>
                     </tr>
                 </thead>
                 <tbody>

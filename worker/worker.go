@@ -15,6 +15,7 @@ type Worker interface {
 	Start()
 	LaunchCampaign(c models.Campaign)
 	SendTestEmail(s *models.EmailRequest) error
+	SendEmails(ms []*models.MailLog)
 }
 
 // DefaultWorker is the background worker that handles watching for new campaigns and sending emails appropriately.
@@ -142,6 +143,17 @@ func (w *DefaultWorker) LaunchCampaign(c models.Campaign) {
 			log.Error(err)
 			return
 		}
+		mailEntries = append(mailEntries, m)
+	}
+	w.mailer.Queue(mailEntries)
+}
+
+// SendEmails immediately queues the provided maillogs to the mailer for
+// sending. It's used to dispatch one-off resends without waiting for the
+// scheduler's next polling cycle.
+func (w *DefaultWorker) SendEmails(ms []*models.MailLog) {
+	mailEntries := []mailer.Mail{}
+	for _, m := range ms {
 		mailEntries = append(mailEntries, m)
 	}
 	w.mailer.Queue(mailEntries)
