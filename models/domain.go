@@ -20,17 +20,20 @@ import (
 // the desired record set, and n8n performs the actual Cloudflare + Microsoft
 // Graph work plus any additional steps.
 type Domain struct {
-	Id           int64     `json:"id"`
-	UserId       int64     `json:"-"`
-	CompanyId    int64     `json:"company_id"`
-	Name         string    `json:"name"`
-	IP           string    `json:"ip"`
-	Registrar    string    `json:"registrar"`
-	AutoARecord  bool      `json:"auto_a_record"`
-	Configure365 bool      `json:"configure_365"`
-	Status       string    `json:"status"`      // pending | verified | failed
-	M365Status   string    `json:"m365_status"` // not_connected | connected
-	ModifiedDate time.Time `json:"modified_date"`
+	// Column names are pinned explicitly so Gorm's CamelCase->snake_case
+	// derivation (which would map Configure365 -> "configure365") always agrees
+	// with the migration's column names.
+	Id           int64     `json:"id" gorm:"column:id;primary_key:yes"`
+	UserId       int64     `json:"-" gorm:"column:user_id"`
+	CompanyId    int64     `json:"company_id" gorm:"column:company_id"`
+	Name         string    `json:"name" gorm:"column:name"`
+	IP           string    `json:"ip" gorm:"column:ip"`
+	Registrar    string    `json:"registrar" gorm:"column:registrar"`
+	AutoARecord  bool      `json:"auto_a_record" gorm:"column:auto_a_record"`
+	Configure365 bool      `json:"configure_365" gorm:"column:configure_365"`
+	Status       string    `json:"status" gorm:"column:status"`           // pending | verified | failed
+	M365Status   string    `json:"m365_status" gorm:"column:m365_status"` // not_connected | connected
+	ModifiedDate time.Time `json:"modified_date" gorm:"column:modified_date"`
 	// Records is not persisted; it is populated on create so the UI can show
 	// the desired record set that was sent to n8n.
 	Records []DNSRecord `json:"records,omitempty" gorm:"-"`
