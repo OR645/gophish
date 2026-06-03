@@ -76,6 +76,81 @@ function fetchImageAsDataURL(url) {
         })
 }
 
+// captureHtmlToImage - renders an HTML string off-screen and rasterizes it to a
+// PNG data URI with html2canvas, producing a real screenshot-style image.
+// Resolves to null (never rejects) if html2canvas is unavailable or capture fails.
+function captureHtmlToImage(html, width) {
+    if (typeof window.html2canvas !== "function") return Promise.resolve(null)
+    return new Promise(function (resolve) {
+        var iframe = document.createElement("iframe")
+        // allow-same-origin lets us read the rendered DOM; no allow-scripts so
+        // the email/page content can't execute.
+        iframe.setAttribute("sandbox", "allow-same-origin")
+        iframe.style.position = "fixed"
+        iframe.style.left = "-10000px"
+        iframe.style.top = "0"
+        iframe.style.width = width + "px"
+        iframe.style.height = "600px"
+        iframe.style.border = "0"
+        iframe.style.background = "#ffffff"
+        var done = false
+        var cleanup = function (result) {
+            if (done) return
+            done = true
+            if (iframe.parentNode) iframe.parentNode.removeChild(iframe)
+            resolve(result)
+        }
+        iframe.onload = function () {
+            // Give images/fonts a moment to settle before rasterizing.
+            setTimeout(function () {
+                try {
+                    var doc = iframe.contentDocument
+                    var body = doc.body
+                    var h = Math.min(Math.max(body.scrollHeight, doc.documentElement.scrollHeight, 400), 4000)
+                    iframe.style.height = h + "px"
+                    window.html2canvas(body, {
+                        backgroundColor: "#ffffff",
+                        useCORS: true,
+                        allowTaint: false,
+                        scale: 1,
+                        width: width,
+                        height: h,
+                        windowWidth: width,
+                        windowHeight: h,
+                        imageTimeout: 3000,
+                        logging: false
+                    }).then(function (canvas) {
+                        var url = null
+                        try { url = canvas.toDataURL("image/png") } catch (e) { url = null }
+                        cleanup(url)
+                    }).catch(function () { cleanup(null) })
+                } catch (e) {
+                    cleanup(null)
+                }
+            }, 600)
+        }
+        // Safety timeout in case onload never fires.
+        setTimeout(function () { cleanup(null) }, 12000)
+        document.body.appendChild(iframe)
+        iframe.srcdoc = html
+    })
+}
+
+// captureCampaignAssets - screenshots the campaign email body and landing page.
+function captureCampaignAssets(campaign) {
+    var tmpl = campaign.template || {}
+    var emailHtml = tmpl.html || (tmpl.text
+        ? '<pre style="white-space:pre-wrap;font-family:monospace;padding:16px;margin:0;">' + escapeHtml(tmpl.text) + '</pre>'
+        : "")
+    var pageHtml = (campaign.page || {}).html || ""
+    return Promise.all([
+        emailHtml ? captureHtmlToImage(emailHtml, 800) : Promise.resolve(null),
+        pageHtml ? captureHtmlToImage(pageHtml, 1000) : Promise.resolve(null)
+    ]).then(function (imgs) {
+        return { emailImg: imgs[0], pageImg: imgs[1] }
+    })
+}
+
 // renderReportPayload - renders the credentials a target submitted (password
 // values masked) plus the source IP, for the high-risk timeline.
 function renderReportPayload(detailsJson) {
@@ -136,9 +211,20 @@ function buildPreviewIframe(html, isHtml, emptyMsg) {
     return '<iframe class="preview-frame" sandbox srcdoc="' + reportAttrEscape(doc) + '"></iframe>'
 }
 
+// screenshotOrFallback - prefers a captured PNG screenshot; falls back to a live
+// sandboxed iframe preview, then to an empty-state message.
+function screenshotOrFallback(imgDataUrl, html, isHtml, emptyMsg, altText) {
+    if (imgDataUrl) {
+        return '<div class="screenshot"><img src="' + imgDataUrl + '" alt="' + altText + '"></div>'
+    }
+    return buildPreviewIframe(html, isHtml, emptyMsg)
+}
+
 // buildPhishingReportHTML - returns the full standalone HTML document string.
-// logoDataUrl is an optional base64 data URI for the Yazamco logo.
-function buildPhishingReportHTML(campaign, companyName, logoDataUrl) {
+// logoDataUrl is an optional base64 data URI for the Yazamco logo; assets holds
+// the captured {emailImg, pageImg} PNG data URIs.
+function buildPhishingReportHTML(campaign, companyName, logoDataUrl, assets) {
+    assets = assets || {}
     var launchDate = reportHebrewDate(campaign.launch_date)
     var phishingUrl = campaign.url || ""
 
@@ -179,8 +265,10 @@ function buildPhishingReportHTML(campaign, companyName, logoDataUrl) {
         : '<h2 style="color:var(--primary);margin:0;font-size:2.2rem;">Yazamco pro Cyber</h2>'
 
     var tmpl = campaign.template || {}
-    var emailPreview = buildPreviewIframe(tmpl.html || tmpl.text || "", !!tmpl.html, "לא הוגדר תוכן למייל בקמפיין זה")
-    var pagePreview = buildPreviewIframe((campaign.page || {}).html || "", true, "לא הוגדר דף נחיתה בקמפיין זה")
+    var emailPreview = screenshotOrFallback(assets.emailImg, tmpl.html || tmpl.text || "", !!tmpl.html,
+        "לא הוגדר תוכן למייל בקמפיין זה", "צילום מסך של הודעת הדואר")
+    var pagePreview = screenshotOrFallback(assets.pageImg, (campaign.page || {}).html || "", true,
+        "לא הוגדר דף נחיתה בקמפיין זה", "צילום מסך של דף הנחיתה")
     var highRiskTimeline = buildHighRiskTimeline(campaign, sortedResults)
 
     var employeeRows = sortedResults.map(function (result) {
@@ -495,7 +583,22 @@ function buildPhishingReportHTML(campaign, companyName, logoDataUrl) {
         }
 
 
-        /* Inline previews (replace the manual screenshot placeholders) */
+        /* Captured screenshots (email / landing page) */
+        .screenshot {
+            margin: 12px 0;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.10);
+        }
+
+        .screenshot img {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        /* Inline previews (fallback when a screenshot can't be captured) */
         .preview-frame {
             width: 100%;
             height: 640px;
@@ -989,15 +1092,26 @@ function promptCompanyAndOpen(campaign) {
     }).then(function (result) {
         if (!result.value) return
         var companyName = result.value
-        // Load the logo as a data URI so the report is self-contained; build
-        // regardless of whether the logo resolves.
-        fetchImageAsDataURL("/images/yazamco-logo.png")
-            .then(function (dataUrl) {
-                openReportWindow(buildPhishingReportHTML(campaign, companyName, dataUrl))
-            })
-            .catch(function () {
-                openReportWindow(buildPhishingReportHTML(campaign, companyName, null))
-            })
+        // Show a loading dialog while we capture screenshots (can take a moment).
+        Swal.fire({
+            title: "Generating Report",
+            html: "Capturing screenshots, please wait…",
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            onOpen: function () { Swal.showLoading() }
+        })
+        // Load the logo (data URI -> self-contained) and capture the email +
+        // landing-page screenshots in parallel; build regardless of failures.
+        Promise.all([
+            fetchImageAsDataURL("/images/yazamco-logo.png").catch(function () { return null }),
+            captureCampaignAssets(campaign)
+        ]).then(function (res) {
+            Swal.close()
+            openReportWindow(buildPhishingReportHTML(campaign, companyName, res[0], res[1]))
+        }).catch(function () {
+            Swal.close()
+            openReportWindow(buildPhishingReportHTML(campaign, companyName, null, {}))
+        })
     })
 }
 
