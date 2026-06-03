@@ -46,6 +46,47 @@ function reportFindingSeverity(status) {
     }
 }
 
+// Risk ranking used to pick the "highest-risk" recipient and to sort the
+// per-employee table (Submitted Data > Clicked Link > Email Opened > Email Sent).
+var REPORT_RISK_ORDER = { "Submitted Data": 1, "Clicked Link": 2, "Email Opened": 3, "Email Sent": 4 }
+
+function reportSortByRisk(results) {
+    return (results || []).slice().sort(function (a, b) {
+        var oa = REPORT_RISK_ORDER[a.status] || 99
+        var ob = REPORT_RISK_ORDER[b.status] || 99
+        if (oa !== ob) return oa - ob
+        return (a.first_name || "").localeCompare(b.first_name || "")
+    })
+}
+
+// renderGophishTemplate - substitutes the gophish phishing-template tokens
+// ({{.URL}}, {{.Tracker}}, {{.FirstName}}, ...) that gophish only fills in at
+// send time, so the captured screenshot renders like the real email / page.
+function renderGophishTemplate(html, campaign, recipient) {
+    if (!html) return html
+    recipient = recipient || {}
+    var url = campaign.url || "#"
+    var repl = {
+        "URL": url,
+        "BaseURL": url,
+        "TrackingURL": url,
+        "Tracker": "", // hidden 1x1 tracking pixel - drop it from the preview
+        "From": "",
+        "RId": recipient.id || "preview",
+        "Email": recipient.email || "user@example.com",
+        "FirstName": recipient.first_name || "",
+        "LastName": recipient.last_name || "",
+        "Position": recipient.position || ""
+    }
+    var out = html
+    Object.keys(repl).forEach(function (key) {
+        out = out.replace(new RegExp("{{\\s*\\." + key + "\\s*}}", "g"), repl[key])
+    })
+    // Strip any remaining template actions so they don't show as literal text.
+    out = out.replace(/{{\s*\.[^}]*}}/g, "")
+    return out
+}
+
 // Timeline event -> Hebrew label / icon / color (matches the report palette).
 var REPORT_EVENT_INFO = {
     "Campaign Created": { he: "הקמפיין נוצר", icon: "fa-rocket", color: "var(--accent)" },
@@ -76,9 +117,40 @@ function fetchImageAsDataURL(url) {
         })
 }
 
+// waitForDocumentReady - resolves once every image in the document has finished
+// loading (or errored) and web fonts are ready, plus a short settle delay so the
+// final layout is stable. Capped so a slow remote asset can't hang the capture.
+function waitForDocumentReady(doc) {
+    return new Promise(function (resolve) {
+        var settled = false
+        var settle = function () {
+            if (settled) return
+            settled = true
+            var fontsReady = (doc.fonts && doc.fonts.ready) ? doc.fonts.ready : Promise.resolve()
+            fontsReady.catch(function () {}).then(function () {
+                // One more tick so reflow from fonts/images is painted.
+                setTimeout(resolve, 350)
+            })
+        }
+        var imgs = Array.prototype.slice.call(doc.images || [])
+        var pending = imgs.filter(function (im) { return !im.complete })
+        if (!pending.length) { settle(); return }
+        var remaining = pending.length
+        var cap = setTimeout(settle, 6000) // don't wait forever on a stuck asset
+        var onDone = function () {
+            remaining--
+            if (remaining <= 0) { clearTimeout(cap); settle() }
+        }
+        pending.forEach(function (im) {
+            im.addEventListener("load", onDone)
+            im.addEventListener("error", onDone)
+        })
+    })
+}
+
 // captureHtmlToImage - renders an HTML string off-screen and rasterizes it to a
-// PNG data URI with html2canvas, producing a real screenshot-style image.
-// Resolves to null (never rejects) if html2canvas is unavailable or capture fails.
+// PNG data URI with html2canvas at 2x scale (sharp), producing a real
+// screenshot-style image. Resolves to null (never rejects) on failure.
 function captureHtmlToImage(html, width) {
     if (typeof window.html2canvas !== "function") return Promise.resolve(null)
     return new Promise(function (resolve) {
@@ -101,23 +173,23 @@ function captureHtmlToImage(html, width) {
             resolve(result)
         }
         iframe.onload = function () {
-            // Give images/fonts a moment to settle before rasterizing.
-            setTimeout(function () {
+            var doc = iframe.contentDocument
+            // Wait until images + fonts have actually loaded before capturing.
+            waitForDocumentReady(doc).then(function () {
                 try {
-                    var doc = iframe.contentDocument
                     var body = doc.body
-                    var h = Math.min(Math.max(body.scrollHeight, doc.documentElement.scrollHeight, 400), 4000)
+                    var h = Math.min(Math.max(body.scrollHeight, doc.documentElement.scrollHeight, 400), 5000)
                     iframe.style.height = h + "px"
                     window.html2canvas(body, {
                         backgroundColor: "#ffffff",
                         useCORS: true,
                         allowTaint: false,
-                        scale: 1,
+                        scale: 2, // 2x for a crisp, high-resolution screenshot
                         width: width,
                         height: h,
                         windowWidth: width,
                         windowHeight: h,
-                        imageTimeout: 3000,
+                        imageTimeout: 8000,
                         logging: false
                     }).then(function (canvas) {
                         var url = null
@@ -127,10 +199,10 @@ function captureHtmlToImage(html, width) {
                 } catch (e) {
                     cleanup(null)
                 }
-            }, 600)
+            })
         }
-        // Safety timeout in case onload never fires.
-        setTimeout(function () { cleanup(null) }, 12000)
+        // Safety timeout in case onload/asset loading never completes.
+        setTimeout(function () { cleanup(null) }, 25000)
         document.body.appendChild(iframe)
         iframe.srcdoc = html
     })
@@ -138,11 +210,14 @@ function captureHtmlToImage(html, width) {
 
 // captureCampaignAssets - screenshots the campaign email body and landing page.
 function captureCampaignAssets(campaign) {
+    var recipient = reportSortByRisk(campaign.results)[0] || {}
     var tmpl = campaign.template || {}
-    var emailHtml = tmpl.html || (tmpl.text
-        ? '<pre style="white-space:pre-wrap;font-family:monospace;padding:16px;margin:0;">' + escapeHtml(tmpl.text) + '</pre>'
-        : "")
-    var pageHtml = (campaign.page || {}).html || ""
+    var emailHtml = tmpl.html
+        ? renderGophishTemplate(tmpl.html, campaign, recipient)
+        : (tmpl.text
+            ? '<pre style="white-space:pre-wrap;font-family:monospace;padding:16px;margin:0;">' + escapeHtml(renderGophishTemplate(tmpl.text, campaign, recipient)) + '</pre>'
+            : "")
+    var pageHtml = renderGophishTemplate((campaign.page || {}).html || "", campaign, recipient)
     return Promise.all([
         emailHtml ? captureHtmlToImage(emailHtml, 800) : Promise.resolve(null),
         pageHtml ? captureHtmlToImage(pageHtml, 1000) : Promise.resolve(null)
@@ -250,13 +325,8 @@ function buildPhishingReportHTML(campaign, companyName, logoDataUrl, assets) {
             severityRate === "בינונית" ? "severity-medium" : "severity-low"
 
     // Sort employees: Submitted Data > Clicked Link > Email Opened > Email Sent, then by first name.
-    var sortOrder = { "Submitted Data": 1, "Clicked Link": 2, "Email Opened": 3, "Email Sent": 4 }
-    var sortedResults = results.slice().sort(function (a, b) {
-        var oa = sortOrder[a.status] || 99
-        var ob = sortOrder[b.status] || 99
-        if (oa !== ob) return oa - ob
-        return (a.first_name || "").localeCompare(b.first_name || "")
-    })
+    var sortedResults = reportSortByRisk(results)
+    var topRecipient = sortedResults[0] || {}
 
     // Logo (data URI keeps the report self-contained), live previews and the
     // high-risk timeline that replace the manual screenshot placeholders.
@@ -265,9 +335,14 @@ function buildPhishingReportHTML(campaign, companyName, logoDataUrl, assets) {
         : '<h2 style="color:var(--primary);margin:0;font-size:2.2rem;">Yazamco pro Cyber</h2>'
 
     var tmpl = campaign.template || {}
-    var emailPreview = screenshotOrFallback(assets.emailImg, tmpl.html || tmpl.text || "", !!tmpl.html,
+    // Render gophish tokens so the fallback iframe preview matches the screenshot.
+    var emailFallback = tmpl.html
+        ? renderGophishTemplate(tmpl.html, campaign, topRecipient)
+        : renderGophishTemplate(tmpl.text || "", campaign, topRecipient)
+    var pageFallback = renderGophishTemplate((campaign.page || {}).html || "", campaign, topRecipient)
+    var emailPreview = screenshotOrFallback(assets.emailImg, emailFallback, !!tmpl.html,
         "לא הוגדר תוכן למייל בקמפיין זה", "צילום מסך של הודעת הדואר")
-    var pagePreview = screenshotOrFallback(assets.pageImg, (campaign.page || {}).html || "", true,
+    var pagePreview = screenshotOrFallback(assets.pageImg, pageFallback, true,
         "לא הוגדר דף נחיתה בקמפיין זה", "צילום מסך של דף הנחיתה")
     var highRiskTimeline = buildHighRiskTimeline(campaign, sortedResults)
 
@@ -583,9 +658,10 @@ function buildPhishingReportHTML(campaign, companyName, logoDataUrl, assets) {
         }
 
 
-        /* Captured screenshots (email / landing page) */
+        /* Captured screenshots (email / landing page) - shown small & centered */
         .screenshot {
-            margin: 12px 0;
+            margin: 14px auto;
+            max-width: 440px;
             border: 1px solid var(--border);
             border-radius: 8px;
             overflow: hidden;
