@@ -11,6 +11,112 @@ var labels = {
 var campaigns = []
 var campaign = {}
 
+// ---- Saved URLs (picker) --------------------------------------------------
+// A list of phishing-listener URLs is persisted in the browser's localStorage
+// so the same URLs can be reused across several parallel campaigns without
+// retyping. (Stored client-side because this build ships frontend-only.)
+var SAVED_URLS_KEY = "gophish.savedURLs"
+
+function getSavedURLs() {
+    try {
+        return JSON.parse(localStorage.getItem(SAVED_URLS_KEY)) || []
+    } catch (e) {
+        return []
+    }
+}
+
+function saveURL(url) {
+    url = $.trim(url || "")
+    if (url === "") {
+        return
+    }
+    var urls = getSavedURLs()
+    if (urls.indexOf(url) === -1) {
+        urls.push(url)
+        localStorage.setItem(SAVED_URLS_KEY, JSON.stringify(urls))
+    }
+}
+
+function removeSavedURL(url) {
+    var urls = getSavedURLs().filter(function (u) {
+        return u !== url
+    })
+    localStorage.setItem(SAVED_URLS_KEY, JSON.stringify(urls))
+}
+
+// Initialize the #url select2 as a tag input sourced from the saved URLs.
+// Picking an entry selects it; typing a new value creates (and on launch saves)
+// a new entry.
+function setupURLSelect() {
+    var $url = $("#url")
+    var data = getSavedURLs().map(function (u) {
+        return { id: u, text: u }
+    })
+    if ($url.hasClass("select2-hidden-accessible")) {
+        $url.select2("destroy")
+        $url.empty().append("<option></option>")
+    }
+    $url.select2({
+        placeholder: "http://192.168.1.1",
+        tags: true,
+        data: data,
+        createTag: function (params) {
+            var term = $.trim(params.term)
+            if (term === "") {
+                return null
+            }
+            return { id: term, text: term }
+        }
+    })
+}
+
+// Set the #url select to a specific value, adding it as an option first if it
+// isn't already known (used when copying an existing campaign).
+function setURLValue(url) {
+    var $url = $("#url")
+    if (url) {
+        var exists = false
+        $url.find("option").each(function () {
+            if (this.value === url) {
+                exists = true
+            }
+        })
+        if (!exists) {
+            $url.append(new Option(url, url, true, true))
+        }
+    }
+    $url.val(url || null).trigger("change")
+}
+
+function renderSavedURLList() {
+    var urls = getSavedURLs()
+    if (!urls.length) {
+        return '<div style="color:#888;padding:8px 0;">No saved URLs yet. Type a URL when creating a campaign and it will be saved here.</div>'
+    }
+    return '<ul style="list-style:none;padding:0;margin:0;">' + urls.map(function (u) {
+        return '<li style="display:flex;align-items:center;justify-content:space-between;padding:6px 4px;border-bottom:1px solid #eee;">' +
+            '<span style="word-break:break-all;margin-right:8px;">' + escapeHtml(u) + '</span>' +
+            '<button type="button" class="btn btn-sm btn-danger remove-url-btn" data-url="' + escapeHtml(u) + '" title="Remove">' +
+            '<i class="fa fa-trash-o"></i></button>' +
+            '</li>'
+    }).join("") + '</ul>'
+}
+
+// Open a small dialog listing the saved URLs with the ability to delete them.
+function manageURLs() {
+    Swal.fire({
+        title: "Saved URLs",
+        html: '<div class="url-list-wrap" style="text-align:left;">' + renderSavedURLList() + '</div>',
+        showConfirmButton: false,
+        showCloseButton: true
+    })
+    $(document).off("click.removeurl").on("click.removeurl", ".remove-url-btn", function () {
+        removeSavedURL($(this).attr("data-url"))
+        $(".url-list-wrap").html(renderSavedURLList())
+        setupURLSelect()
+    })
+}
+
 // ---- SOC-redesign list helpers --------------------------------------------
 // Status -> pill style (matches the prototype StatusPill).
 function campaignStatusPill(status, quickStats) {
@@ -126,6 +232,8 @@ function launch() {
                     send_by_date: send_by_date || null,
                     groups: groups,
                 }
+                // Remember this URL so it can be reused for parallel campaigns
+                saveURL(campaign.url)
                 // Submit the campaign
                 api.campaigns.post(campaign)
                     .success(function (data) {
@@ -171,6 +279,7 @@ function sendTestEmail() {
             name: $("#profile").select2("data")[0].text
         }
     }
+    saveURL(test_email_request.url)
     btnHtml = $("#sendTestModalSubmit").html()
     $("#sendTestModalSubmit").html('<i class="fa fa-spinner fa-spin"></i> Sending')
     // Send the test email
@@ -192,7 +301,7 @@ function dismiss() {
     $("#name").val("");
     $("#template").val("").change();
     $("#page").val("").change();
-    $("#url").val("");
+    $("#url").val(null).trigger("change");
     $("#profile").val("").change();
     $("#users").val("").change();
     $("#modal").modal('hide');
@@ -242,6 +351,7 @@ function deleteCampaign(idx) {
 }
 
 function setupOptions() {
+    setupURLSelect()
     api.groups.summary()
         .success(function (summaries) {
             groups = summaries.groups
@@ -363,7 +473,7 @@ function copy(idx) {
                 $("#profile").val(campaign.smtp.id.toString());
                 $("#profile").trigger("change.select2")
             }
-            $("#url").val(campaign.url)
+            setURLValue(campaign.url)
         })
         .error(function (data) {
             $("#modal\\.flashes").empty().append("<div style=\"text-align:center\" class=\"alert alert-danger\">\
@@ -418,6 +528,7 @@ $(document).ready(function () {
     $('#modal').on('hidden.bs.modal', function (event) {
         dismiss()
     });
+    $("#manageUrlsBtn").on("click", manageURLs);
     api.campaigns.summary()
         .success(function (data) {
             campaigns = data.campaigns

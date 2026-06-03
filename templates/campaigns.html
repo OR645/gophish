@@ -94,9 +94,15 @@
                     <option></option>
                     </select>
                     <label class="control-label" for="url">URL:
-                        <i class="fa fa-question-circle" data-toggle="tooltip" data-placement="right" title="Location of Gophish listener (must be reachable by targets!)"></i>
+                        <i class="fa fa-question-circle" data-toggle="tooltip" data-placement="right" title="Location of Gophish listener (must be reachable by targets!). Pick a saved URL or type a new one — new URLs are saved automatically for reuse across parallel campaigns."></i>
                     </label>
-                    <input type="text" class="form-control" placeholder="http://192.168.1.1" id="url" />
+                    <div class="input-group">
+                        <select class="form-control" id="url"><option></option></select>
+                        <span class="input-group-btn">
+                            <button type="button" id="manageUrlsBtn" class="btn btn-default button" title="Manage saved URLs">
+                                <i class="fa fa-cog"></i></button>
+                        </span>
+                    </div>
                     <div class="row">
                         <div class="col-md-6">
                             <label class="control-label" for="url">Launch Date </label>
