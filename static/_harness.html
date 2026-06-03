@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-density="regular">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>field harness</title>
+<link href="/css/dist/gophish.css" rel="stylesheet">
+<link href="/css/soc.css" rel="stylesheet">
+<style> body{padding:24px;} .harness-col{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start;} .lbl{font-family:var(--mono-font);font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:1px;margin:18px 0 8px;} .modal.cx.show{display:block;position:static;} .modal.cx.show .modal-dialog{margin:0;} </style>
+</head>
+<body>
+<div class="canvas">
+  <div class="harness-col">
+    <!-- LEFT: legacy control-label + form-group + input-group pattern (templates/landing/groups style) -->
+    <div class="panel"><div class="panel-body">
+      <div class="lbl">legacy form-group pattern</div>
+      <label class="control-label" for="a1">Name:</label>
+      <div class="form-group"><input type="text" class="form-control" id="a1" placeholder="Campaign name"></div>
+      <label class="control-label" for="a2">Company (Optional)</label>
+      <div class="input-group">
+        <select class="form-control" id="a2"><option>No company</option><option>Acme</option></select>
+        <span class="input-group-btn"><button class="btn btn-default" type="button"><i class="fa fa-plus"></i></button></span>
+      </div>
+      <label class="control-label" for="a3">URL:</label>
+      <div class="input-group">
+        <input type="text" class="form-control" id="a3" placeholder="http://192.168.1.1">
+        <span class="input-group-btn"><button class="btn btn-default" type="button"><i class="fa fa-cog"></i></button></span>
+      </div>
+      <label class="control-label" for="a4">Sending Profile:</label>
+      <select class="form-control" id="a4"><option>Select a sending profile</option></select>
+      <div class="checkbox checkbox-primary"><input id="a5" type="checkbox" checked><label for="a5">Add Tracking Image</label></div>
+      <label class="control-label" for="a6">Body:</label>
+      <div class="form-group"><textarea rows="4" class="form-control" id="a6" placeholder="text"></textarea></div>
+    </div></div>
+
+    <!-- RIGHT: cx .field pattern -->
+    <div class="panel"><div class="panel-body">
+      <div class="lbl">cx .field pattern</div>
+      <div class="stack" style="gap:15px;">
+        <div class="field"><label>Profile name</label><input type="text" class="form-control" placeholder="e.g. Mailgun"></div>
+        <div class="soc-grid-2" style="gap:12px;">
+          <div class="field"><label>Host</label><input type="text" class="form-control" placeholder="smtp:587"></div>
+          <div class="field"><label>Username</label><input type="text" class="form-control" placeholder="user"></div>
+        </div>
+        <div class="field"><label>Role</label><select class="form-control"><option>Admin</option><option>User</option></select></div>
+        <label class="checkrow" style="margin:0;"><input type="checkbox" checked><span class="bx"><i class="fa fa-check"></i></span><div style="flex:1;"><b style="font-size:13px;display:block;font-weight:600;">Ignore certificate errors</b><span class="mono" style="font-size:10.5px;color:var(--ink-dim);">allow self-signed certs</span></div></label>
+        <div class="field"><label>Message body</label><textarea class="form-control" style="height:120px;"></textarea></div>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="lbl">cx campaign modal (native selects standing in for select2)</div>
+  <div class="modal cx show"><div class="modal-dialog"><div class="modal-content">
+    <div class="cx-head"><div class="hi"><i class="fa fa-bullseye"></i></div><div style="min-width:0;"><h4 class="modal-title">New Campaign</h4><p class="cx-sub">Name your simulation and pick a company.</p></div><button class="icon-btn cx-x"><i class="fa fa-times"></i></button></div>
+    <div class="cx-body">
+      <div class="cx-main">
+        <div class="stepper">
+          <div class="st done"><span class="b"><i class="fa fa-check"></i></span><span class="lbl" style="margin:0;text-transform:none;letter-spacing:0;color:var(--ink-mid);">Details</span></div>
+          <div class="ln filled"><i></i></div>
+          <div class="st active"><span class="b">2</span><span class="lbl" style="margin:0;text-transform:none;letter-spacing:0;color:var(--ink);">Email</span></div>
+          <div class="ln"><i></i></div>
+          <div class="st"><span class="b">3</span><span class="lbl" style="margin:0;text-transform:none;letter-spacing:0;color:var(--ink-faint);">Page</span></div>
+        </div>
+        <div class="step-head"><h4>Details</h4></div>
+        <div class="stack" style="gap:15px;">
+          <div class="field"><label>Campaign name</label><input type="text" class="form-control" placeholder="e.g. Q3 Invoice Notice"></div>
+          <div class="field"><label>Company <span class="hint">optional</span></label>
+            <div class="input-group"><select class="form-control" id="mcompany"><option>No company</option><option>Acme Corporation</option></select><span class="input-group-btn"><button class="btn btn-default" type="button"><i class="fa fa-plus"></i></button></span></div>
+          </div>
+          <div class="choice sel"><span class="ck"><i class="fa fa-check"></i></span><div style="flex:1;min-width:0;"><b style="font-size:13.5px;display:block;">Password Expiry Alert</b><span class="mono" style="font-size:11px;color:var(--ink-dim);">Action required: confirm your account</span></div><span class="tag">clicks only</span></div>
+          <div class="choice"><span class="ck"><i class="fa fa-check"></i></span><div style="flex:1;min-width:0;"><b style="font-size:13.5px;display:block;">Invoice Notice</b><span class="mono" style="font-size:11px;color:var(--ink-dim);">Q3 invoice ready</span></div></div>
+        </div>
+      </div>
+      <div class="cx-aside">
+        <span class="cx-label">Campaign preview</span>
+        <div class="sumcard"><div class="sr" style="background:var(--accent-soft);"><div class="si" style="background:var(--accent);color:#fff;"><i class="fa fa-bullseye"></i></div><div><div class="sl">Simulation</div><div class="sv">Untitled</div></div></div><div class="sr"><div class="si"><i class="fa fa-users"></i></div><div><div class="sl">Recipients</div><div class="sv">0</div></div></div></div>
+      </div>
+    </div>
+    <div class="cx-foot"><button class="btn btn-ghost">Back</button><div class="grow"></div><span class="mono" style="font-size:10.5px;color:var(--ink-faint);">step 2 / 7</span><button class="btn btn-primary">Continue&nbsp;<i class="fa fa-chevron-right"></i></button></div>
+  </div></div></div>
+</div>
+<script src="/js/dist/vendor.min.js"></script>
+<script>
+try {
+  jQuery(function ($) {
+    $.fn.select2 && $("#a2,#a4,#mcompany").select2({ width: "100%" });
+  });
+} catch (e) { document.title = "ERR:" + e.message; }
+</script>
+</body>
+</html>

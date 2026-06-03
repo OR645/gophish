@@ -974,4 +974,103 @@ body.auth > .container { width: 100%; max-width: none; margin: 0; padding: 0; }
 
 /* in-modal field hint + select alignment */
 .cx-main .field .hint, .cx-aside .field .hint { font-size: 10.5px; color: var(--ink-faint); font-family: var(--mono-font); }
-.modal.cx select.input, .modal.cx select.form-control { height: 42px; }
+
+/* ============================================================
+   FORM CONTROL NORMALIZATION  (app-wide consistency)
+   One control height everywhere; consistent label spacing; no
+   colliding corners in input-groups; select2 matched to inputs.
+   Fixes mixed Bootstrap-34px vs design-42px heights and labels
+   sitting on top of their fields.
+   ============================================================ */
+:root { --field-h: 42px; }
+
+/* --- single-line controls: one height, vertically centered --- */
+input.form-control:not([type="checkbox"]):not([type="radio"]),
+select.form-control,
+.input:not(textarea),
+.modal .form-control:not(textarea),
+.canvas .form-control:not(textarea) {
+  height: var(--field-h) !important;
+  padding: 6px 13px !important;
+  font-size: 13.5px !important;
+  line-height: 1.4 !important;
+  vertical-align: middle;
+}
+select.form-control { padding-right: 30px !important; }
+
+/* --- multi-line controls grow with content, never forced to 42 --- */
+textarea.form-control, textarea.input, .modal textarea.form-control {
+  height: auto !important;
+  min-height: 96px !important;
+  padding: 10px 13px !important;
+  line-height: 1.6 !important;
+}
+
+/* --- labels: never glued to / overlapping their field --- */
+.canvas .control-label,
+.canvas .form-group > label,
+.modal .control-label,
+.modal .form-group > label {
+  display: inline-block;
+  margin: 0 0 6px !important;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+/* uniform vertical rhythm between stacked groups */
+.canvas .form-group, .modal .form-group { margin-bottom: 15px; }
+.modal .form-group:last-child { margin-bottom: 0; }
+/* .field already controls its own label spacing via flex gap */
+.field > label, .field label { margin: 0 !important; }
+
+/* --- checkbox / radio rows: consistent spacing, no overlap --- */
+.canvas .checkbox, .canvas .radio,
+.modal .checkbox, .modal .radio { margin: 10px 0 !important; padding-left: 0; min-height: 0; }
+.checkbox label, .radio label { font-weight: 500; }
+
+/* --- input-group: square the touching corners, align heights --- */
+.input-group { display: table; width: 100%; }
+.input-group .form-control:not(:first-child),
+.input-group .select2-container:not(:first-child) .select2-selection { border-top-left-radius: 0 !important; border-bottom-left-radius: 0 !important; }
+.input-group .form-control:not(:last-child),
+.input-group .select2-container:not(:last-child) .select2-selection { border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; }
+.input-group-btn > .btn,
+.input-group-addon {
+  height: var(--field-h) !important;
+  display: inline-flex !important;
+  align-items: center;
+  border-radius: 0 !important;
+}
+.input-group-btn:last-child > .btn { border-top-right-radius: 9px !important; border-bottom-right-radius: 9px !important; }
+.input-group-btn:first-child > .btn { border-top-left-radius: 9px !important; border-bottom-left-radius: 9px !important; }
+
+/* --- select2 single: exact input height, centered text --- */
+.select2-container { width: 100% !important; max-width: 100%; }
+.select2-container--default .select2-selection--single {
+  height: var(--field-h) !important;
+  padding: 0 !important;
+  display: flex; align-items: center;
+}
+.select2-container--default .select2-selection--single .select2-selection__rendered {
+  line-height: calc(var(--field-h) - 2px) !important;
+  padding-left: 13px !important; padding-right: 26px !important;
+  font-size: 13.5px;
+}
+.select2-container--default .select2-selection--single .select2-selection__arrow {
+  height: calc(var(--field-h) - 2px) !important; right: 6px;
+}
+/* select2 multi (groups): grows, but starts at the standard height */
+.select2-container--default .select2-selection--multiple {
+  min-height: var(--field-h) !important;
+  padding: 3px 6px !important;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+}
+.select2-container--default .select2-selection--multiple .select2-selection__choice {
+  margin: 0 !important; line-height: 1.6; padding: 1px 8px;
+}
+.select2-container--default .select2-search--inline .select2-search__field { margin: 0 !important; height: 28px; }
+/* select2 inside an input-group must not break to its own line */
+.input-group .select2-container { display: table-cell; vertical-align: middle; float: none; }
+
+/* the gophish editor textarea + CKEditor box keep theme width */
+.modal .gophish-editor { width: 100% !important; }
