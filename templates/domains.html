@@ -3,6 +3,13 @@
   <div class="canvas-inner stack fade-up">
     <div id="flashes"></div>
 
+    <div class="soc-between" style="margin-bottom:18px;">
+        <div class="soc-section-title">Domains</div>
+        <button type="button" class="btn btn-primary" id="new_button" data-toggle="modal" data-backdrop="static"
+            data-domain-id="-1" data-target="#modal">
+            <i class="fa fa-plus"></i>&nbsp;Add Domain</button>
+    </div>
+
     <div class="kpi-grid" id="domainKpis"></div>
 
     <div id="loading">
@@ -11,7 +18,7 @@
 
     <div id="emptyMessage" style="display:none;">
         <div class="alert alert-info">
-            No domains added yet. Add an already-purchased domain to auto-configure its DNS and Microsoft 365 records.
+            No domains added yet. Click <b>Add Domain</b> above to register an already-purchased domain and auto-configure its DNS and Microsoft 365 records.
         </div>
     </div>
 
@@ -20,7 +27,7 @@
         <div class="panel dom-list">
             <div class="soc-between" style="padding:6px 8px 8px;">
                 <span class="soc-section-title" style="margin:0;">Domains · <span id="domCount">0</span></span>
-                <button type="button" class="btn btn-sm btn-primary" id="new_button" data-toggle="modal"
+                <button type="button" class="btn btn-sm btn-primary" id="new_button_list" data-toggle="modal"
                     data-backdrop="static" data-domain-id="-1" data-target="#modal">
                     <i class="fa fa-plus"></i>&nbsp;Add</button>
             </div>

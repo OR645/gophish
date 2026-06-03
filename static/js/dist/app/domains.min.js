@@ -347,7 +347,7 @@ const deleteDomain = (id) => {
 $(document).ready(function () {
     load();
     $("#modal").on("hide.bs.modal", function () { dismiss(); });
-    $("#new_button").on("click", function () { editDomain(-1); });
+    $("#new_button, #new_button_list").on("click", function () { editDomain(-1); });
 
     // toggle switches
     $("#autoARow").on("click", function () {
