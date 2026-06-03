@@ -11,6 +11,47 @@ var labels = {
 var campaigns = []
 var campaign = {}
 
+// smtpProfiles caches the sending profiles loaded for the wizard so the
+// company -> domain auto-wiring can select a profile whose From address matches
+// the company's domain. campaignDomains caches the domains for the same reason.
+var smtpProfiles = []
+var campaignDomains = []
+
+// applyCompanyDomain wires a selected company's domain into the wizard: it
+// auto-fills the listener URL (https://<domain>) and selects an existing
+// sending profile whose From address ends in @<domain>. If no profile matches,
+// a hint is shown in the sending-profile step. Selecting a company is a
+// deliberate action, so this intentionally overrides the URL / profile.
+function applyCompanyDomain(companyId) {
+    var hint = $("#domainProfileHint")
+    if (!companyId) {
+        hint.hide()
+        return
+    }
+    var domain = campaignDomains.find(function (d) {
+        return String(d.company_id) === String(companyId)
+    })
+    if (!domain || !domain.name) {
+        hint.hide()
+        return
+    }
+    // Auto-fill the listener URL from the domain.
+    setURLValue("https://" + domain.name)
+    saveURL("https://" + domain.name)
+    // Auto-select a sending profile whose From address matches the domain.
+    var suffix = "@" + domain.name.toLowerCase()
+    var match = smtpProfiles.find(function (p) {
+        return p.from_address && p.from_address.toLowerCase().indexOf(suffix) !== -1
+    })
+    if (match) {
+        $("#profile").val(String(match.id)).trigger("change.select2").trigger("change")
+        hint.hide()
+    } else {
+        hint.html('<i class="fa fa-info-circle"></i>&nbsp;No sending profile uses <b>' + escapeHtml(domain.name) +
+            '</b>. Create one with a From address like <span class="soc-mono">phish@' + escapeHtml(domain.name) + '</span>.').show()
+    }
+}
+
 // ---- Saved URLs (picker) --------------------------------------------------
 // A list of phishing-listener URLs is persisted in the browser's localStorage
 // so the same URLs can be reused across several parallel campaigns without
@@ -414,6 +455,11 @@ function loadCompanies(selectedId) {
 function setupOptions() {
     setupURLSelect()
     loadCompanies()
+    // Cache domains so selecting a company can auto-wire its domain into the
+    // listener URL and matching sending profile.
+    api.domains.get()
+        .success(function (ds) { campaignDomains = ds || [] })
+        .error(function () { campaignDomains = [] })
     api.groups.summary()
         .success(function (summaries) {
             groups = summaries.groups
@@ -489,6 +535,7 @@ function setupOptions() {
                 modalError("No profiles found!")
                 return false
             } else {
+                smtpProfiles = profiles
                 var profile_s2 = $.map(profiles, function (obj) {
                     obj.text = obj.name
                     return obj
@@ -762,6 +809,10 @@ $(document).ready(function () {
     $("#page").on("change", function () { wizSyncSingle("#pageChoices", "#page"); wizUpdatePreview() })
     $("#profile").on("change", function () { wizSyncSingle("#profileChoices", "#profile"); wizUpdatePreview() })
     $("#users").on("change", function () { wizSyncGroups(); wizUpdatePreview() })
+    // Selecting a company auto-wires its domain into the listener URL and a
+    // matching sending profile. (select2 preselects fire change.select2 only,
+    // so copying an existing campaign won't trigger this.)
+    $("#company").on("change", function () { applyCompanyDomain($(this).val()); wizUpdatePreview() })
     $("#name").on("input", wizUpdatePreview)
     showStep(0)
     // Add a new company inline from the campaign modal.

@@ -37,6 +37,11 @@ type Config struct {
 	TestFlag       bool        `json:"test_flag"`
 	ContactAddress string      `json:"contact_address"`
 	Logging        *log.Config `json:"logging"`
+	// N8nWebhookURL, when set, is the n8n webhook that gophish POSTs to when a
+	// domain is created so n8n can perform DNS / Microsoft 365 provisioning and
+	// any additional steps. N8nWebhookSecret is used to HMAC-sign the payload.
+	N8nWebhookURL    string `json:"n8n_webhook_url"`
+	N8nWebhookSecret string `json:"n8n_webhook_secret"`
 }
 
 // Version contains the current gophish version

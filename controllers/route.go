@@ -130,6 +130,7 @@ func (as *AdminServer) registerRoutes() {
 	router.HandleFunc("/campaigns", mid.Use(as.Campaigns, mid.RequireLogin))
 	router.HandleFunc("/campaigns/{id:[0-9]+}", mid.Use(as.CampaignID, mid.RequireLogin))
 	router.HandleFunc("/companies", mid.Use(as.Companies, mid.RequireLogin))
+	router.HandleFunc("/domains", mid.Use(as.Domains, mid.RequireLogin))
 	router.HandleFunc("/templates", mid.Use(as.Templates, mid.RequireLogin))
 	router.HandleFunc("/groups", mid.Use(as.Groups, mid.RequireLogin))
 	router.HandleFunc("/landing_pages", mid.Use(as.LandingPages, mid.RequireLogin))
@@ -223,6 +224,13 @@ func (as *AdminServer) Companies(w http.ResponseWriter, r *http.Request) {
 	params := newTemplateParams(r)
 	params.Title = "Companies"
 	getTemplate(w, "companies").ExecuteTemplate(w, "base", params)
+}
+
+// Domains handles the domains management page
+func (as *AdminServer) Domains(w http.ResponseWriter, r *http.Request) {
+	params := newTemplateParams(r)
+	params.Title = "Domains"
+	getTemplate(w, "domains").ExecuteTemplate(w, "base", params)
 }
 
 // Templates handles the default path and template execution

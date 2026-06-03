@@ -1,0 +1,119 @@
+{{define "body"}}
+<div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
+  <div class="canvas-inner stack fade-up">
+    <div id="flashes"></div>
+
+    <div class="kpi-grid" id="domainKpis"></div>
+
+    <div id="loading">
+        <i class="fa fa-spinner fa-spin fa-4x"></i>
+    </div>
+
+    <div id="emptyMessage" style="display:none;">
+        <div class="alert alert-info">
+            No domains added yet. Add an already-purchased domain to auto-configure its DNS and Microsoft 365 records.
+        </div>
+    </div>
+
+    <div class="dom-layout" id="domLayout" style="display:none;">
+        <!-- LIST -->
+        <div class="panel dom-list">
+            <div class="soc-between" style="padding:6px 8px 8px;">
+                <span class="soc-section-title" style="margin:0;">Domains · <span id="domCount">0</span></span>
+                <button type="button" class="btn btn-sm btn-primary" id="new_button" data-toggle="modal"
+                    data-backdrop="static" data-domain-id="-1" data-target="#modal">
+                    <i class="fa fa-plus"></i>&nbsp;Add</button>
+            </div>
+            <div id="domItems"></div>
+        </div>
+
+        <!-- DETAIL -->
+        <div class="panel" style="overflow:hidden;" id="domDetail"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Add / Edit Domain Modal -->
+<div class="modal fade cx" id="modal" tabindex="-1" role="dialog" aria-labelledby="domainModalLabel">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="cx-head">
+                <div class="hi"><i class="fa fa-globe"></i></div>
+                <div style="min-width:0;">
+                    <h4 class="modal-title" id="domainModalLabel">Add Domain</h4>
+                    <p class="cx-sub">register an already-purchased sending / landing domain</p>
+                </div>
+                <button type="button" class="icon-btn cx-x" data-dismiss="modal" aria-label="Close"><i class="fa fa-times"></i></button>
+            </div>
+            <div class="cx-body">
+                <div class="cx-main" id="modal_body">
+                    <div id="modal.flashes" style="margin-bottom:14px;"></div>
+                    <div class="stack" style="gap:15px;">
+                        <div class="field">
+                            <label for="name">Domain name</label>
+                            <input type="text" class="form-control" placeholder="e.g. acme-secure.io" id="name" required autofocus />
+                        </div>
+                        <div class="soc-grid-2" style="gap:12px;">
+                            <div class="field">
+                                <label for="registrar">Registrar</label>
+                                <select class="form-control" id="registrar">
+                                    <option>Cloudflare</option>
+                                    <option>Namecheap</option>
+                                    <option>GoDaddy</option>
+                                    <option>Route 53</option>
+                                    <option>Google Domains</option>
+                                    <option>Other</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="ip">Origin IPv4</label>
+                                <input type="text" class="form-control soc-mono" placeholder="192.0.2.10" id="ip" />
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label for="company">Company <span class="hint">optional</span>
+                                <i class="fa fa-question-circle" data-toggle="tooltip" data-placement="right"
+                                    title="Associate this domain with a company. When you pick that company in a campaign, this domain auto-fills the listener URL and a matching sending profile is selected."></i>
+                            </label>
+                            <div class="input-group">
+                                <select class="form-control" id="company"><option></option></select>
+                                <span class="input-group-btn">
+                                    <button type="button" id="addCompanyBtn" class="btn btn-default" title="Add a new company"><i class="fa fa-plus"></i></button>
+                                </span>
+                            </div>
+                        </div>
+                        <hr class="divider">
+                        <span class="cx-label">On creation</span>
+                        <div class="choice" id="autoARow">
+                            <div style="flex:1;min-width:0;">
+                                <div class="strong">Auto-configure A record</div>
+                                <div class="hint" style="font-family:var(--ui-font);">point the root domain at the origin IPv4 via Cloudflare</div>
+                            </div>
+                            <span class="switch on" id="autoASwitch"></span>
+                        </div>
+                        <div class="choice" id="connect365Row">
+                            <div style="flex:1;min-width:0;">
+                                <div class="strong">Connect to Microsoft 365</div>
+                                <div class="hint" style="font-family:var(--ui-font);">provision MX, SPF, Autodiscover, DKIM &amp; DMARC records</div>
+                            </div>
+                            <span class="switch on" id="connect365Switch"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="cx-aside">
+                    <span class="cx-label">Live preview</span>
+                    <div class="sumcard" id="domPreview"></div>
+                    <div class="soc-mono" style="font-size:10.5px;color:var(--ink-faint);line-height:1.6;" id="domPreviewNote"></div>
+                </div>
+            </div>
+            <div class="cx-foot">
+                <button type="button" class="btn btn-ghost" data-dismiss="modal">Cancel</button>
+                <div class="grow"></div>
+                <button type="button" class="btn btn-primary" id="modalSubmit"><i class="fa fa-check"></i>&nbsp;Add domain</button>
+            </div>
+        </div>
+    </div>
+</div>
+{{end}} {{define "scripts"}}
+<script src="/js/dist/app/domains.min.js"></script>
+{{end}}

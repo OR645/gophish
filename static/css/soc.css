@@ -798,6 +798,9 @@ body.auth > .container { width: 100%; max-width: none; margin: 0; padding: 0; }
 .modal.cx .modal-dialog { width: 80%; max-width: 1500px; margin: 24px auto; }
 .modal.cx.md .modal-dialog { width: 70%; max-width: 1150px; }
 .modal.cx.sm .modal-dialog { width: 50%; max-width: 720px; min-width: 420px; }
+/* editor-heavy modals (Email Templates / Landing Pages) — kept at a fixed,
+   narrower width instead of the wide % default */
+.modal.cx.cx-narrow .modal-dialog { width: 800px; max-width: 96vw; min-width: 0; }
 .modal.cx .modal-content {
   background: var(--panel) !important;
   border: 1px solid var(--border) !important;
@@ -1078,3 +1081,56 @@ textarea.form-control, textarea.input, .modal textarea.form-control {
 
 /* the gophish editor textarea + CKEditor box keep theme width */
 .modal .gophish-editor { width: 100% !important; }
+
+/* ============================================================
+   Domains page — list / detail two-pane layout + DNS records
+   ============================================================ */
+.dom-layout { display: grid; grid-template-columns: 320px 1fr; gap: 14px; align-items: start; }
+@media (max-width: 980px) { .dom-layout { grid-template-columns: 1fr; } }
+
+.dom-list { padding: 10px; }
+.dom-item {
+  display: flex; align-items: center; gap: 11px;
+  padding: 10px 11px; border-radius: 10px; cursor: pointer;
+  border: 1px solid transparent; transition: .14s;
+}
+.dom-item:hover { background: var(--hover); }
+.dom-item.sel { background: var(--accent-soft); border-color: var(--accent-line); }
+.dom-item .di-ic {
+  width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
+  display: grid; place-items: center; background: var(--panel-2); color: var(--ink-dim);
+}
+.dom-item.sel .di-ic { background: var(--accent); color: #fff; }
+.dom-item .di-n { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.dom-item .di-n b { color: var(--ink); font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dom-item .di-n span { color: var(--ink-dim); font-size: 11px; font-family: var(--mono-font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dom-item .di-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+.dom-head { display: flex; align-items: center; gap: 13px; padding: 15px var(--pad); border-bottom: 1px solid var(--border-soft); }
+.dom-head .dh-ic { width: 42px; height: 42px; border-radius: 11px; flex-shrink: 0; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+.dom-head h3 { margin: 0; font-size: 16px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dom-head .dh-sub { font-size: 11.5px; color: var(--ink-dim); font-family: var(--mono-font); margin-top: 2px; }
+
+.dom-meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border-soft); border-bottom: 1px solid var(--border-soft); }
+@media (max-width: 700px) { .dom-meta { grid-template-columns: repeat(2, 1fr); } }
+.dom-meta > div { background: var(--panel); padding: 13px var(--pad); }
+.dom-meta .ml { font-family: var(--mono-font); font-size: 10px; letter-spacing: 0.8px; text-transform: uppercase; color: var(--ink-faint); }
+.dom-meta .mv { font-size: 13px; font-weight: 600; color: var(--ink); margin-top: 3px; display: flex; align-items: center; gap: 6px; }
+
+.intg { padding: var(--pad); display: flex; flex-direction: column; gap: 12px; }
+.intg-card { display: flex; align-items: center; gap: 13px; padding: 14px; border: 1px solid var(--border-soft); border-radius: 12px; background: var(--panel); }
+.intg-card.on { border-color: color-mix(in oklch, var(--c-reported) 40%, transparent); background: color-mix(in oklch, var(--c-reported) 8%, transparent); }
+.intg-card .it-tile { width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); }
+.intg-card.on .it-tile { color: #fff; }
+.intg-card .it-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.intg-card .it-body b { color: var(--ink); font-size: 13.5px; font-weight: 600; }
+.intg-card .it-body span { color: var(--ink-dim); font-size: 11.5px; }
+
+.prov-list { display: flex; flex-direction: column; gap: 6px; }
+.prov-row { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid var(--border-soft); border-radius: 9px; }
+.prov-row .pi { width: 18px; height: 18px; display: grid; place-items: center; flex-shrink: 0; color: var(--c-reported); }
+.prov-row .pr-l { display: flex; flex-direction: column; min-width: 0; }
+.prov-row .pr-l b { font-size: 12.5px; color: var(--ink); font-weight: 600; }
+.prov-row .pr-l span { font-size: 11px; color: var(--ink-dim); font-family: var(--mono-font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.rec-type { display: inline-flex; align-items: center; font-family: var(--mono-font); font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; letter-spacing: 0.4px; }

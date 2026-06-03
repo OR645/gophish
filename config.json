@@ -16,6 +16,8 @@
 	"db_path": "gophish.db",
 	"migrations_prefix": "db/db_",
 	"contact_address": "",
+	"n8n_webhook_url": "",
+	"n8n_webhook_secret": "",
 	"logging": {
 		"filename": "",
 		"level": ""

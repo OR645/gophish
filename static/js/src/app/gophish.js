@@ -175,6 +175,32 @@ var api = {
             return query("/companies/" + id, "DELETE", {}, false)
         }
     },
+    // domains contains the endpoints for /domains
+    domains: {
+        // get() - Queries the API for GET /domains
+        get: function () {
+            return query("/domains/", "GET", {}, false)
+        },
+        // post() - Posts a domain to POST /domains
+        post: function (domain) {
+            return query("/domains/", "POST", domain, false)
+        }
+    },
+    // domainId contains the endpoints for /domains/:id
+    domainId: {
+        // get() - Queries the API for GET /domains/:id
+        get: function (id) {
+            return query("/domains/" + id, "GET", {}, false)
+        },
+        // put() - Puts a domain to PUT /domains/:id
+        put: function (domain) {
+            return query("/domains/" + domain.id, "PUT", domain, false)
+        },
+        // delete() - Deletes a domain at DELETE /domains/:id
+        delete: function (id) {
+            return query("/domains/" + id, "DELETE", {}, false)
+        }
+    },
     // templates contains the endpoints for /templates
     templates: {
         // get() - Queries the API for GET /templates
