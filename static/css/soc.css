@@ -793,9 +793,11 @@ body.auth > .container { width: 100%; max-width: none; margin: 0; padding: 0; }
 .spin { animation: cxSpin 0.9s linear infinite; }
 
 /* ---- shell: size the dialog, turn .modal-content into the cx card ---- */
-.modal.cx .modal-dialog { width: 980px; max-width: 96vw; margin: 24px auto; }
-.modal.cx.md .modal-dialog { width: 720px; }
-.modal.cx.sm .modal-dialog { width: 540px; }
+/* widths are a share of the viewport (capped so they don't stretch absurdly
+   on ultrawide screens). .md is the 70%-of-page baseline; others scale with it. */
+.modal.cx .modal-dialog { width: 80%; max-width: 1500px; margin: 24px auto; }
+.modal.cx.md .modal-dialog { width: 70%; max-width: 1150px; }
+.modal.cx.sm .modal-dialog { width: 50%; max-width: 720px; min-width: 420px; }
 .modal.cx .modal-content {
   background: var(--panel) !important;
   border: 1px solid var(--border) !important;
@@ -842,7 +844,9 @@ body.auth > .container { width: 100%; max-width: none; margin: 0; padding: 0; }
 .modal.cx .divider { height: 1px; background: var(--border-soft); margin: 6px 0; border: 0; }
 
 @media (max-width: 860px) {
-  .modal.cx .modal-dialog { width: 96vw; }
+  .modal.cx .modal-dialog,
+  .modal.cx.md .modal-dialog,
+  .modal.cx.sm .modal-dialog { width: 96vw; max-width: 96vw; min-width: 0; }
   .cx-body { flex-direction: column; }
   .cx-aside { width: auto; border-left: none; border-top: 1px solid var(--border-soft); }
 }
