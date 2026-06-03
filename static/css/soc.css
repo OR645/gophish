@@ -778,3 +778,200 @@ body.auth > .container { width: 100%; max-width: none; margin: 0; padding: 0; }
 .canvas-inner > .kpi-grid + .soc-between,
 .canvas-inner > .soc-between + .panel { margin-top: 16px; }
 .kpi-grid + .kpi-grid, .panel + .panel { margin-top: 14px; }
+
+/* ============================================================
+   RICH CREATION / EDIT MODALS  (cx-modal)
+   Ported from new_gophish/creators.jsx and adapted to wrap the
+   existing Bootstrap modal: add class "cx" (+ optional sm/md) to a
+   `.modal`, and structure its .modal-content as
+   .cx-head / .cx-body (.cx-main [+ .cx-aside]) / .cx-foot.
+   Bootstrap keeps owning show/hide/backdrop/stacking + select2.
+   ============================================================ */
+@keyframes cxModalIn { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes cxStepIn  { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
+@keyframes cxSpin    { to { transform: rotate(360deg); } }
+.spin { animation: cxSpin 0.9s linear infinite; }
+
+/* ---- shell: size the dialog, turn .modal-content into the cx card ---- */
+.modal.cx .modal-dialog { width: 980px; max-width: 96vw; margin: 24px auto; }
+.modal.cx.md .modal-dialog { width: 720px; }
+.modal.cx.sm .modal-dialog { width: 540px; }
+.modal.cx .modal-content {
+  background: var(--panel) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 36px 90px -28px oklch(0 0 0 / 0.72) !important;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  max-height: calc(100vh - 48px);
+  animation: cxModalIn .28s cubic-bezier(.2,.7,.2,1) both;
+}
+:root[data-theme="light"] .modal.cx .modal-content { box-shadow: 0 30px 70px -28px oklch(0.4 0.05 256 / 0.4) !important; }
+
+/* ---- header ---- */
+.cx-head {
+  display: flex; align-items: center; gap: 14px;
+  padding: 17px 22px; border-bottom: 1px solid var(--border-soft); flex-shrink: 0;
+  position: relative;
+}
+.cx-head::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
+  background: linear-gradient(90deg, var(--accent-line), transparent 55%);
+}
+.cx-head .hi {
+  width: 44px; height: 44px; border-radius: 13px; flex-shrink: 0;
+  display: grid; place-items: center; color: var(--accent);
+  background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+.cx-head .hi i { font-size: 20px; line-height: 1; }
+.cx-head h3, .cx-head .modal-title { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.3px; color: var(--ink); }
+.cx-head p, .cx-head .cx-sub { margin: 3px 0 0; font-size: 12.5px; color: var(--ink-dim); }
+.cx-head .cx-x { margin-left: auto; flex-shrink: 0; opacity: 1; text-shadow: none; float: none; }
+
+/* ---- body / panes ---- */
+.cx-body { display: flex; min-height: 0; flex: 1; }
+.cx-main { flex: 1; min-width: 0; padding: 22px; overflow-y: auto; }
+.cx-aside {
+  width: 396px; flex-shrink: 0; background: var(--bg-sink);
+  border-left: 1px solid var(--border-soft); padding: 22px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 15px;
+}
+.cx-foot { display: flex; align-items: center; gap: 10px; padding: 14px 22px; border-top: 1px solid var(--border-soft); flex-shrink: 0; }
+.cx-foot .grow { flex: 1; }
+.cx-label { font-family: var(--mono-font); font-size: 10px; letter-spacing: 1.3px; text-transform: uppercase; color: var(--ink-faint); }
+.modal.cx .divider { height: 1px; background: var(--border-soft); margin: 6px 0; border: 0; }
+
+@media (max-width: 860px) {
+  .modal.cx .modal-dialog { width: 96vw; }
+  .cx-body { flex-direction: column; }
+  .cx-aside { width: auto; border-left: none; border-top: 1px solid var(--border-soft); }
+}
+
+/* ---- horizontal numbered stepper ---- */
+.stepper { display: flex; align-items: center; margin-bottom: 22px; }
+.stepper .st { display: flex; align-items: center; gap: 9px; cursor: pointer; }
+.stepper .st .b {
+  width: 27px; height: 27px; border-radius: 50%; border: 1.5px solid var(--border);
+  display: grid; place-items: center; font: 600 12px var(--mono-font); color: var(--ink-dim);
+  transition: .22s; flex-shrink: 0; background: var(--panel);
+}
+.stepper .st .b i { font-size: 12px; }
+.stepper .st.active .b { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.stepper .st.done .b { background: var(--accent); border-color: transparent; color: #fff; }
+.stepper .st .lbl { font-size: 12px; font-weight: 600; color: var(--ink-faint); white-space: nowrap; transition: .2s; }
+.stepper .st.active .lbl { color: var(--ink); }
+.stepper .st.done .lbl { color: var(--ink-mid); }
+.stepper .ln { flex: 1; height: 2px; background: var(--border); margin: 0 9px; border-radius: 2px; position: relative; overflow: hidden; min-width: 12px; }
+.stepper .ln i { position: absolute; inset: 0; width: 0; background: var(--accent); transition: width .4s cubic-bezier(.2,.7,.2,1); }
+.stepper .ln.filled i { width: 100%; }
+@media (max-width: 880px) { .stepper .st .lbl { display: none; } }
+
+.step-head { margin-bottom: 16px; }
+.step-head h4 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.3px; color: var(--ink); }
+.step-head p { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-dim); }
+.step-pane { animation: cxStepIn .3s cubic-bezier(.2,.7,.2,1) both; }
+.step-pane[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { .step-pane, .modal.cx .modal-content { animation: none; } }
+
+/* ---- choice cards (pickers) ---- */
+.choice .ck { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--border); display: grid; place-items: center; flex-shrink: 0; color: #fff; }
+.choice.sel .ck { background: var(--accent); border-color: transparent; }
+.choice .ck i { font-size: 10px; opacity: 0; }
+.choice.sel .ck i { opacity: 1; }
+.choice b { color: var(--ink); }
+
+/* ---- checkbox option row (square) ---- */
+.checkrow { display: flex; align-items: center; gap: 11px; padding: 11px 13px; border: 1px solid var(--border-soft); border-radius: 10px; cursor: pointer; transition: .14s; }
+.checkrow:hover { border-color: var(--border); background: var(--hover); }
+.checkrow.on { border-color: var(--accent); background: var(--accent-soft); }
+.checkrow .bx { width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--border); display: grid; place-items: center; flex-shrink: 0; transition: .14s; color: #fff; }
+.checkrow.on .bx { background: var(--accent); border-color: transparent; }
+.checkrow .bx i { font-size: 10px; opacity: 0; }
+.checkrow.on .bx i { opacity: 1; }
+.checkrow b { color: var(--ink); }
+/* native-checkbox variant: wrap a real <input type=checkbox> so existing JS
+   that reads/writes .prop("checked") keeps working; state reflected via :has */
+.checkrow input[type="checkbox"], .checkrow input[type="radio"] { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
+.checkrow:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.checkrow:has(input:checked) .bx { background: var(--accent); border-color: transparent; }
+.checkrow:has(input:checked) .bx i { opacity: 1; }
+
+/* ---- chips / tag input ---- */
+.chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: 7px; padding: 4px 8px; font-size: 11.5px; font-family: var(--mono-font); color: var(--ink-mid); }
+.chip .rm { cursor: pointer; color: var(--ink-faint); display: grid; place-items: center; }
+.chip .rm:hover { color: var(--c-submitted); }
+.chip.insert { cursor: pointer; color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); transition: .14s; }
+.chip.insert:hover { background: var(--accent-line); }
+
+/* ---- member builder list ---- */
+.minilist { border: 1px solid var(--border-soft); border-radius: 10px; overflow: hidden; background: var(--panel); }
+.minilist .mi { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--border-soft); font-size: 12.5px; }
+.minilist .mi:last-child { border-bottom: none; }
+.minilist .mi .gn { flex: 1; min-width: 0; }
+.minilist .mi .gn b { font-weight: 600; display: block; color: var(--ink); }
+.minilist .mi .gn span { font-family: var(--mono-font); font-size: 10.5px; color: var(--ink-faint); }
+.minilist-empty { padding: 26px; text-align: center; font-size: 12px; color: var(--ink-faint); }
+
+/* ---- live email preview ---- */
+.mailprev { border: 1px solid var(--border-soft); border-radius: 12px; overflow: hidden; background: var(--panel); box-shadow: var(--shadow); }
+.mailprev .mh { padding: 13px 15px; border-bottom: 1px solid var(--border-soft); }
+.mailprev .mh .subj { font-size: 14px; font-weight: 600; letter-spacing: -0.2px; margin-bottom: 9px; word-break: break-word; color: var(--ink); }
+.mailprev .mh .fromline { display: flex; align-items: center; gap: 10px; }
+.mailprev .mh .fromline .av { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(140deg, var(--accent), var(--accent-strong)); display: grid; place-items: center; color: #fff; font-weight: 600; font-size: 12px; flex-shrink: 0; }
+.mailprev .mh .fromline .who b { font-size: 12.5px; display: block; color: var(--ink); }
+.mailprev .mh .fromline .who span { font-family: var(--mono-font); font-size: 10.5px; color: var(--ink-faint); }
+.mailprev .mb { padding: 16px 15px; font-size: 12.5px; line-height: 1.7; color: var(--ink-mid); max-height: 320px; overflow: auto; }
+.mailprev .mb .cta { display: inline-block; margin-top: 12px; background: var(--accent); color: #fff; font-weight: 600; font-size: 12px; padding: 8px 16px; border-radius: 7px; }
+.mailprev .mb .hl { color: var(--accent); font-weight: 600; }
+
+/* ---- live browser preview ---- */
+.webprev { border: 1px solid var(--border-soft); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+.webprev .wb { height: 200px; position: relative; background: repeating-linear-gradient(135deg, var(--panel-2) 0 11px, transparent 11px 22px), var(--bg-sink); }
+.webprev .wb .form-ph { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 9px; align-items: center; justify-content: center; padding: 24px; }
+.webprev .wb .form-ph .lg { width: 40px; height: 40px; border-radius: 10px; background: var(--accent-soft); border: 1px solid var(--accent-line); margin-bottom: 4px; }
+.webprev .wb .form-ph .ln { height: 30px; width: 80%; max-width: 220px; border-radius: 7px; background: var(--panel); border: 1px solid var(--border-soft); }
+.webprev .wb .form-ph .btn-ph { height: 30px; width: 80%; max-width: 220px; border-radius: 7px; background: var(--accent); }
+
+/* ---- test-connection / ping status ---- */
+.teststat { display: flex; align-items: center; gap: 9px; font-size: 12.5px; font-weight: 500; padding: 11px 13px; border-radius: 10px; border: 1px solid var(--border-soft); background: var(--panel); color: var(--ink-mid); }
+.teststat.ok { color: var(--c-reported); border-color: color-mix(in oklch, var(--c-reported) 40%, transparent); background: color-mix(in oklch, var(--c-reported) 8%, transparent); }
+.teststat.run { color: var(--accent); }
+.teststat.err { color: var(--c-submitted); border-color: color-mix(in oklch, var(--c-submitted) 40%, transparent); background: color-mix(in oklch, var(--c-submitted) 8%, transparent); }
+
+/* ---- code / json sample ---- */
+.codebox { background: var(--bg-sink); border: 1px solid var(--border-soft) !important; border-radius: 10px; padding: 12px 14px; font-family: var(--mono-font); font-size: 11px; line-height: 1.65; color: var(--ink-mid) !important; overflow-x: auto; white-space: pre; }
+.codebox .k { color: var(--accent); }
+.codebox .s { color: var(--c-reported); }
+
+/* ---- summary card (review / preview aside) ---- */
+.sumcard { border: 1px solid var(--border-soft); border-radius: 12px; overflow: hidden; background: var(--panel); }
+.sumcard .sr { display: flex; align-items: center; gap: 12px; padding: 12px 15px; border-bottom: 1px solid var(--border-soft); }
+.sumcard .sr:last-child { border-bottom: none; }
+.sumcard .sr .si { width: 32px; height: 32px; border-radius: 9px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; flex-shrink: 0; }
+.sumcard .sr .si i { font-size: 14px; }
+.sumcard .sr .sl { font-family: var(--mono-font); font-size: 10px; letter-spacing: 0.8px; text-transform: uppercase; color: var(--ink-faint); }
+.sumcard .sr .sv { font-size: 13px; font-weight: 600; margin-top: 1px; color: var(--ink); }
+.sumcard .sr .sval { margin-left: auto; text-align: right; }
+
+/* ---- projected funnel mini (live preview) ---- */
+.projfunnel { display: flex; flex-direction: column; gap: 7px; }
+.projfunnel .pf { display: grid; grid-template-columns: 72px 1fr 44px; align-items: center; gap: 9px; }
+.projfunnel .pf .pl { font-size: 11px; color: var(--ink-dim); }
+.projfunnel .pf .pt { height: 18px; background: var(--panel-2); border-radius: 5px; overflow: hidden; }
+.projfunnel .pf .pt i { display: block; height: 100%; border-radius: 5px; transition: width .5s cubic-bezier(.2,.7,.2,1); }
+.projfunnel .pf .pv { font-family: var(--mono-font); font-size: 11.5px; font-weight: 600; text-align: right; color: var(--ink); }
+
+/* ---- generated value field (copy/regen) ---- */
+.genline { display: flex; align-items: center; gap: 8px; background: var(--bg-sink); border: 1px solid var(--border); border-radius: 9px; padding: 0 6px 0 13px; height: 42px; }
+.genline code { font-family: var(--mono-font); font-size: 12.5px; color: var(--ink-mid) !important; background: none !important; border: none !important; padding: 0 !important; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- segmented full-width + labelled divider ---- */
+.seg.wide { display: flex; width: 100%; }
+.seg.wide button { flex: 1; justify-content: center; }
+.orline { display: flex; align-items: center; gap: 12px; color: var(--ink-faint); font-size: 11px; font-family: var(--mono-font); }
+.orline::before, .orline::after { content: ""; flex: 1; height: 1px; background: var(--border-soft); }
+
+/* in-modal field hint + select alignment */
+.cx-main .field .hint, .cx-aside .field .hint { font-size: 10.5px; color: var(--ink-faint); font-family: var(--mono-font); }
+.modal.cx select.input, .modal.cx select.form-control { height: 42px; }

@@ -418,6 +418,7 @@ function setupOptions() {
         .success(function (summaries) {
             groups = summaries.groups
             if (groups.length == 0) {
+                wizRenderGroups([])
                 modalError("No groups found!")
                 return false;
             } else {
@@ -426,16 +427,17 @@ function setupOptions() {
                     obj.title = obj.num_targets + " targets"
                     return obj
                 });
-                console.log(group_s2)
                 $("#users.form-control").select2({
                     placeholder: "Select Groups",
                     data: group_s2,
                 });
+                wizRenderGroups(group_s2)
             }
         });
     api.templates.get()
         .success(function (templates) {
             if (templates.length == 0) {
+                wizRenderSingle("#templateChoices", [], "#template")
                 modalError("No templates found!")
                 return false
             } else {
@@ -448,6 +450,7 @@ function setupOptions() {
                     placeholder: "Select a Template",
                     data: template_s2,
                 });
+                wizRenderSingle("#templateChoices", template_s2, "#template", function (t) { return t.subject || "" })
                 if (templates.length === 1) {
                     template_select.val(template_s2[0].id)
                     template_select.trigger('change.select2')
@@ -457,6 +460,7 @@ function setupOptions() {
     api.pages.get()
         .success(function (pages) {
             if (pages.length == 0) {
+                wizRenderSingle("#pageChoices", [], "#page")
                 modalError("No pages found!")
                 return false
             } else {
@@ -469,6 +473,9 @@ function setupOptions() {
                     placeholder: "Select a Landing Page",
                     data: page_s2,
                 });
+                wizRenderSingle("#pageChoices", page_s2, "#page",
+                    function (p) { return p.redirect_url || "" },
+                    function (p) { return p.capture_credentials ? '<span class="tag" style="color:var(--c-submitted);">captures creds</span>' : '<span class="tag">clicks only</span>' })
                 if (pages.length === 1) {
                     page_select.val(page_s2[0].id)
                     page_select.trigger('change.select2')
@@ -478,6 +485,7 @@ function setupOptions() {
     api.SMTP.get()
         .success(function (profiles) {
             if (profiles.length == 0) {
+                wizRenderSingle("#profileChoices", [], "#profile")
                 modalError("No profiles found!")
                 return false
             } else {
@@ -490,6 +498,9 @@ function setupOptions() {
                     placeholder: "Select a Sending Profile",
                     data: profile_s2,
                 }).select2("val", profile_s2[0]);
+                wizRenderSingle("#profileChoices", profile_s2, "#profile",
+                    function (p) { return p.from_address || p.host || "" },
+                    function (p) { return p.ignore_cert_errors ? '<span class="pill pill-clicked"><span class="dot"></span>Check certs</span>' : '<span class="pill pill-reported"><span class="dot"></span>TLS</span>' })
                 if (profiles.length === 1) {
                     profile_select.val(profile_s2[0].id)
                     profile_select.trigger('change.select2')
@@ -498,12 +509,154 @@ function setupOptions() {
         });
 }
 
+/* ============================================================
+   SOC cx campaign wizard
+   Drives the hidden #template/#page/#profile/#users select2 data
+   layer via a stepper + choice cards + a live preview aside, so
+   launch()/copy()/sendTestEmail()/dismiss() keep working unchanged.
+   ============================================================ */
+var WIZ_LABELS = ["Details", "Email", "Page", "Profile", "Targets", "Schedule", "Review"]
+var WIZ_DESC = [
+    "Name your simulation and pick a company.",
+    "Pick the phishing email targets will receive.",
+    "Choose the landing page and listener URL.",
+    "Select the SMTP profile used to deliver mail.",
+    "Choose which groups to include.",
+    "Set the launch time and delivery window.",
+    "Confirm everything, then launch."
+]
+var wizStep = 0
+
+function wizBuildStepper() {
+    var html = ""
+    for (var i = 0; i < WIZ_LABELS.length; i++) {
+        var cls = i === wizStep ? "active" : (i < wizStep ? "done" : "")
+        html += '<div class="st ' + cls + '" data-step="' + i + '"><span class="b">' +
+            (i < wizStep ? '<i class="fa fa-check"></i>' : (i + 1)) + '</span><span class="lbl">' + WIZ_LABELS[i] + '</span></div>'
+        if (i < WIZ_LABELS.length - 1) html += '<div class="ln ' + (i < wizStep ? "filled" : "") + '"><i></i></div>'
+    }
+    $("#campaignStepper").html(html)
+}
+
+function showStep(i) {
+    wizStep = Math.max(0, Math.min(WIZ_LABELS.length - 1, i))
+    $("#modal .step-pane").attr("hidden", true)
+    $('#modal .step-pane[data-step="' + wizStep + '"]').removeAttr("hidden")
+    wizBuildStepper()
+    $("#wizStepDesc").text(WIZ_DESC[wizStep])
+    $("#wizCounter").text("step " + (wizStep + 1) + " / " + WIZ_LABELS.length)
+    $("#wizBack").text(wizStep === 0 ? "Cancel" : "Back")
+    var last = wizStep === WIZ_LABELS.length - 1
+    $("#wizNext").toggle(!last)
+    $("#launchButton").toggle(last)
+    if (last) { wizRenderReview() }
+    wizUpdatePreview()
+    $("#modal .cx-main").scrollTop(0)
+}
+function wizNext() { if (wizStep < WIZ_LABELS.length - 1) { showStep(wizStep + 1) } }
+function wizBack() { if (wizStep === 0) { $("#modal").modal("hide") } else { showStep(wizStep - 1) } }
+
+function wizSelText(sel) {
+    try { var d = $(sel).select2("data"); return (d && d[0]) ? d[0].text : "" } catch (e) { return "" }
+}
+function wizRecipients() {
+    var n = 0
+    $("#groupChoices .choice.sel").each(function () { n += parseInt($(this).attr("data-targets") || "0", 10) || 0 })
+    return n
+}
+function wizRow(icon, label, val, accent) {
+    return '<div class="sr"' + (accent ? ' style="background:var(--accent-soft);"' : '') + '>' +
+        '<div class="si"' + (accent ? ' style="background:var(--accent);color:#fff;"' : '') + '><i class="fa fa-' + icon + '"></i></div>' +
+        '<div style="min-width:0;"><div class="sl">' + label + '</div>' +
+        '<div class="sv" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(String(val)) + '</div></div></div>'
+}
+function wizUpdatePreview() {
+    if (!$("#previewSummary").length) { return }
+    var recips = wizRecipients()
+    $("#previewSummary").html(
+        wizRow("bullseye", "Simulation", $("#name").val() || "Untitled", true) +
+        wizRow("envelope-o", "Template", wizSelText("#template") || "—") +
+        wizRow("file-o", "Page", wizSelText("#page") || "—") +
+        wizRow("paper-plane-o", "Profile", wizSelText("#profile") || "—") +
+        wizRow("users", "Recipients", recips.toLocaleString())
+    )
+    var funnel = [
+        ["Sent", recips, "var(--c-sent)"],
+        ["Opened", Math.round(recips * 0.64), "var(--c-opened)"],
+        ["Clicked", Math.round(recips * 0.30), "var(--c-clicked)"],
+        ["Submitted", Math.round(recips * 0.12), "var(--c-submitted)"]
+    ]
+    var max = recips || 1
+    $("#previewFunnel").html(funnel.map(function (f) {
+        return '<div class="pf"><span class="pl">' + f[0] + '</span><span class="pt"><i style="width:' +
+            Math.max(4, (f[1] / max) * 100) + '%;background:' + f[2] + '"></i></span><span class="pv">' + f[1].toLocaleString() + '</span></div>'
+    }).join(""))
+    var ng = $("#groupChoices .choice.sel").length
+    $("#recipientsNote").text(recips.toLocaleString() + " recipients across " + ng + " group" + (ng === 1 ? "" : "s"))
+}
+function wizRenderReview() {
+    var ng = $("#groupChoices .choice.sel").length
+    $("#reviewSummary").html(
+        wizRow("bullseye", "Campaign", $("#name").val() || "Untitled") +
+        wizRow("envelope-o", "Email template", wizSelText("#template") || "—") +
+        wizRow("file-o", "Landing page", wizSelText("#page") || "—") +
+        wizRow("link", "Listener URL", $("#url").val() || "—") +
+        wizRow("paper-plane-o", "Sending profile", wizSelText("#profile") || "—") +
+        wizRow("users", "Recipients", wizRecipients().toLocaleString() + " across " + ng + " group" + (ng === 1 ? "" : "s")) +
+        wizRow("calendar", "Launch", $("#launch_date").val() || "—")
+    )
+}
+
+// choice card rendering --------------------------------------------------
+function wizChoiceHtml(id, title, sub, right) {
+    return '<div class="choice" data-id="' + id + '">' +
+        '<span class="ck"><i class="fa fa-check"></i></span>' +
+        '<div style="flex:1;min-width:0;"><b style="font-size:13.5px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(title) + '</b>' +
+        (sub ? '<span class="mono" style="font-size:11px;color:var(--ink-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">' + escapeHtml(sub) + '</span>' : '') +
+        '</div>' + (right || '') + '</div>'
+}
+function wizRenderSingle(containerId, items, selId, subFn, rightFn) {
+    var $c = $(containerId)
+    if (!items || !items.length) { $c.html('<div class="minilist-empty">None available — create one first.</div>'); return }
+    $c.html(items.map(function (it) {
+        return wizChoiceHtml(it.id, it.name || it.text, subFn ? subFn(it) : "", rightFn ? rightFn(it) : "")
+    }).join(""))
+    wizSyncSingle(containerId, selId)
+}
+function wizSyncSingle(containerId, selId) {
+    var v = String($(selId).val() || "")
+    $(containerId + " .choice").removeClass("sel").each(function () {
+        if (String($(this).data("id")) === v) { $(this).addClass("sel") }
+    })
+}
+function wizRenderGroups(items) {
+    var $c = $("#groupChoices")
+    if (!items || !items.length) { $c.html('<div class="minilist-empty">No groups yet — create one first.</div>'); return }
+    $c.html(items.map(function (g) {
+        var n = g.num_targets || 0
+        return '<div class="choice" data-id="' + g.id + '" data-targets="' + n + '">' +
+            '<span class="ck"><i class="fa fa-check"></i></span>' +
+            '<div style="flex:1;min-width:0;"><b style="font-size:13.5px;display:block;">' + escapeHtml(g.name) + '</b>' +
+            '<span class="mono" style="font-size:11px;color:var(--ink-dim);">' + n + ' targets</span></div>' +
+            '<span class="num" style="font-weight:600;font-size:13px;color:var(--ink-dim);">' + n + '</span></div>'
+    }).join(""))
+    wizSyncGroups()
+}
+function wizSyncGroups() {
+    var vals = ($("#users").val() || []).map(String)
+    $("#groupChoices .choice").removeClass("sel").each(function () {
+        if (vals.indexOf(String($(this).data("id"))) >= 0) { $(this).addClass("sel") }
+    })
+}
+
 function edit(campaign) {
     setupOptions();
+    showStep(0);
 }
 
 function copy(idx) {
     setupOptions();
+    showStep(0);
     // Set our initial values
     api.campaignId.get(campaigns[idx].id)
         .success(function (campaign) {
@@ -594,6 +747,23 @@ $(document).ready(function () {
         dismiss()
     });
     $("#manageUrlsBtn").on("click", manageURLs);
+    // cx wizard: stepper + choice cards drive the hidden select2 data layer
+    $("#campaignStepper").on("click", ".st", function () { showStep(parseInt($(this).attr("data-step"), 10)) })
+    $("#templateChoices").on("click", ".choice", function () { $("#template").val(String($(this).data("id"))).trigger("change.select2").trigger("change") })
+    $("#pageChoices").on("click", ".choice", function () { $("#page").val(String($(this).data("id"))).trigger("change.select2").trigger("change") })
+    $("#profileChoices").on("click", ".choice", function () { $("#profile").val(String($(this).data("id"))).trigger("change.select2").trigger("change") })
+    $("#groupChoices").on("click", ".choice", function () {
+        $(this).toggleClass("sel")
+        var ids = []
+        $("#groupChoices .choice.sel").each(function () { ids.push(String($(this).data("id"))) })
+        $("#users").val(ids).trigger("change.select2").trigger("change")
+    })
+    $("#template").on("change", function () { wizSyncSingle("#templateChoices", "#template"); wizUpdatePreview() })
+    $("#page").on("change", function () { wizSyncSingle("#pageChoices", "#page"); wizUpdatePreview() })
+    $("#profile").on("change", function () { wizSyncSingle("#profileChoices", "#profile"); wizUpdatePreview() })
+    $("#users").on("change", function () { wizSyncGroups(); wizUpdatePreview() })
+    $("#name").on("input", wizUpdatePreview)
+    showStep(0)
     // Add a new company inline from the campaign modal.
     $("#addCompanyBtn").on("click", function () {
         Swal.fire({

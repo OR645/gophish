@@ -50,17 +50,20 @@
   </div>
 </div>
 <!-- Modal -->
-<div class="modal fade" id="modal" tabindex="-1" role="dialog" aria-labelledby="modalLabel">
+<div class="modal fade cx" id="modal" tabindex="-1" role="dialog" aria-labelledby="groupModalLabel">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
-            <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-                <h4 class="modal-title" id="groupModalLabel">New Group</h4>
+            <div class="cx-head">
+                <div class="hi"><i class="fa fa-users"></i></div>
+                <div style="min-width:0;">
+                    <h4 class="modal-title" id="groupModalLabel">New Group</h4>
+                    <p class="cx-sub">build the target population for your campaigns</p>
+                </div>
+                <button type="button" class="icon-btn cx-x" data-dismiss="modal" aria-label="Close"><i class="fa fa-times"></i></button>
             </div>
-            <div class="modal-body">
-                <div class="row" id="modal.flashes"></div>
+            <div class="cx-body">
+                <div class="cx-main">
+                <div id="modal.flashes" style="margin-bottom:14px;"></div>
                 <label class="control-label" for="name">Name:</label>
                 <div class="form-group">
                     <input type="text" class="form-control" ng-model="group.name" placeholder="Group name" id="name"
@@ -107,10 +110,12 @@
                     <tbody>
                     </tbody>
                 </table>
+                </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" id="modalSubmit">Save changes</button>
+            <div class="cx-foot">
+                <button type="button" class="btn btn-ghost" data-dismiss="modal">Cancel</button>
+                <div class="grow"></div>
+                <button type="button" class="btn btn-primary" id="modalSubmit"><i class="fa fa-check"></i>&nbsp;Save changes</button>
             </div>
         </div>
     </div>

@@ -19,17 +19,20 @@
   </div>
 </div>
 <!-- Modal -->
-<div class="modal fade" id="modal" tabindex="-1" role="dialog" aria-labelledby="modalLabel">
+<div class="modal fade cx" id="modal" tabindex="-1" role="dialog" aria-labelledby="modalLabel">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
-            <!-- New Template Modal -->
-            <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close" onclick="dismiss()"><span
-                        aria-hidden="true">&times;</span></button>
-                <h4 class="modal-title" id="modalLabel">New Landing Page</h4>
+            <div class="cx-head">
+                <div class="hi"><i class="fa fa-file-o"></i></div>
+                <div style="min-width:0;">
+                    <h4 class="modal-title" id="modalLabel">New Landing Page</h4>
+                    <p class="cx-sub">the page targets land on after they click</p>
+                </div>
+                <button type="button" class="icon-btn cx-x" data-dismiss="modal" aria-label="Close" onclick="dismiss()"><i class="fa fa-times"></i></button>
             </div>
-            <div class="modal-body">
-                <div class="row" id="modal.flashes"></div>
+            <div class="cx-body">
+                <div class="cx-main">
+                <div id="modal.flashes" style="margin-bottom:14px;"></div>
                 <label class="control-label" for="name">Name:</label>
                 <div class="form-group">
                     <input type="text" class="form-control" placeholder="Page name" id="name" autofocus />
@@ -70,10 +73,12 @@
                         <input id="redirect_url_input" class="form-control" placeholder="http://example.com" />
                     </div>
                 </div>
+                </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" data-dismiss="modal" class="btn btn-default" onclick="dismiss()">Cancel</button>
-                <button type="button" class="btn btn-primary" id="modalSubmit">Save Page</button>
+            <div class="cx-foot">
+                <button type="button" data-dismiss="modal" class="btn btn-ghost" onclick="dismiss()">Cancel</button>
+                <div class="grow"></div>
+                <button type="button" class="btn btn-primary" id="modalSubmit"><i class="fa fa-check"></i>&nbsp;Save Page</button>
             </div>
         </div>
     </div>
@@ -97,24 +102,30 @@
     </div>
 </div>
 <!-- Modal -->
-<div class="modal fade" id="importSiteModal" tabindex="-1" role="dialog" aria-labelledby="importSiteModalLabel">
+<div class="modal fade cx sm" id="importSiteModal" tabindex="-1" role="dialog" aria-labelledby="importSiteModalLabel">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
-            <!-- New Template Modal -->
-            <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                <h4 class="modal-title" id="importSiteModalLabel">Import Site</h4>
+            <div class="cx-head">
+                <div class="hi"><i class="fa fa-globe"></i></div>
+                <div style="min-width:0;">
+                    <h4 class="modal-title" id="importSiteModalLabel">Import Site</h4>
+                    <p class="cx-sub">clone an existing page by URL</p>
+                </div>
+                <button type="button" class="icon-btn cx-x" data-dismiss="modal" aria-label="Close"><i class="fa fa-times"></i></button>
             </div>
-            <div class="modal-body">
-                <div class="row" id="modal.flashes"></div>
-                <label class="control-label" for="url">URL:</label>
-                <div class="form-group">
-                    <input type="text" class="form-control" placeholder="http://google.com" id="url" autofocus />
+            <div class="cx-body">
+                <div class="cx-main">
+                    <div id="modal.flashes" style="margin-bottom:14px;"></div>
+                    <div class="field">
+                        <label for="url">URL</label>
+                        <input type="text" class="form-control" placeholder="https://example.com" id="url" autofocus />
+                    </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" data-dismiss="modal" class="btn btn-default">Cancel</button>
-                <button type="button" class="btn btn-primary" id="modalSubmit" onclick="importSite()">Import</button>
+            <div class="cx-foot">
+                <button type="button" data-dismiss="modal" class="btn btn-ghost">Cancel</button>
+                <div class="grow"></div>
+                <button type="button" class="btn btn-primary" id="modalSubmit" onclick="importSite()"><i class="fa fa-download"></i>&nbsp;Import</button>
             </div>
         </div>
     </div>

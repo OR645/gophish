@@ -76,119 +76,167 @@
   </div>
 </div>
 <!-- Modal -->
-<div class="modal fade" id="modal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+<div class="modal fade cx" id="modal" tabindex="-1" role="dialog" aria-labelledby="campaignModalLabel">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
-            <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close" onclick="dismiss()">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-                <h4 class="modal-title" id="campaignModalLabel">New Campaign</h4>
+            <div class="cx-head">
+                <div class="hi"><i class="fa fa-bullseye"></i></div>
+                <div style="min-width:0;">
+                    <h4 class="modal-title" id="campaignModalLabel">New Campaign</h4>
+                    <p class="cx-sub" id="wizStepDesc">Name your simulation and pick a company.</p>
+                </div>
+                <button type="button" class="icon-btn cx-x" data-dismiss="modal" aria-label="Close" onclick="dismiss()"><i class="fa fa-times"></i></button>
             </div>
-            <div class="modal-body" id="modal_body">
-                <div class="row" id="modal.flashes"></div>
-                <div class="form-group">
-                    <label for="name">Name:</label>
-                    <input type="text" class="form-control" id="name" placeholder="Campaign name" autofocus>
-                    <label class="control-label" for="company">Company (Optional)
-                        <i class="fa fa-question-circle" data-toggle="tooltip" data-placement="right" title="Associate this campaign with a company so campaigns can be grouped and filtered. Pick an existing company or add a new one."></i>
-                    </label>
-                    <div class="input-group">
-                        <select class="form-control" id="company"><option></option></select>
-                        <span class="input-group-btn">
-                            <button type="button" id="addCompanyBtn" class="btn btn-default button" title="Add a new company">
-                                <i class="fa fa-plus"></i></button>
-                        </span>
+            <div class="cx-body">
+                <div class="cx-main" id="modal_body">
+                    <div class="stepper" id="campaignStepper"></div>
+                    <div id="modal.flashes" style="margin-bottom:14px;"></div>
+
+                    <!-- hidden data layer: select2 sources driven by the choice cards -->
+                    <div style="display:none;" aria-hidden="true">
+                        <select class="form-control" id="template"><option></option></select>
+                        <select class="form-control" id="page"><option></option></select>
+                        <select class="form-control" id="profile"><option></option></select>
+                        <select class="form-control" id="users" multiple="multiple"></select>
                     </div>
-                    <label class="control-label" for="template">Email Template:</label>
-                    <select class="form-control" placeholder="Template Name" id="template" />
-                    <option></option>
-                    </select>
-                    <label class="control-label" for="page">Landing Page:</label>
-                    <select class="form-control" placeholder="Landing Page" id="page" />
-                    <option></option>
-                    </select>
-                    <label class="control-label" for="url">URL:
-                        <i class="fa fa-question-circle" data-toggle="tooltip" data-placement="right" title="Location of Gophish listener (must be reachable by targets!). Pick a saved URL or type a new one — new URLs are saved automatically for reuse across parallel campaigns."></i>
-                    </label>
-                    <div class="input-group">
-                        <select class="form-control" id="url"><option></option></select>
-                        <span class="input-group-btn">
-                            <button type="button" id="manageUrlsBtn" class="btn btn-default button" title="Manage saved URLs">
-                                <i class="fa fa-cog"></i></button>
-                        </span>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <label class="control-label" for="url">Launch Date </label>
-                            <input type="text" class="form-control" id="launch_date" />
+
+                    <!-- STEP 0 · Details -->
+                    <div class="step-pane" data-step="0">
+                        <div class="step-head"><h4>Details</h4></div>
+                        <div class="stack" style="gap:15px;">
+                            <div class="field">
+                                <label for="name">Campaign name</label>
+                                <input type="text" class="form-control" id="name" placeholder="e.g. Q3 Invoice Notice" autofocus>
+                            </div>
+                            <div class="field">
+                                <label for="company">Company <span class="hint">optional</span>
+                                    <i class="fa fa-question-circle" data-toggle="tooltip" data-placement="right" title="Associate this campaign with a company so campaigns can be grouped and filtered. Pick an existing company or add a new one."></i>
+                                </label>
+                                <div class="input-group">
+                                    <select class="form-control" id="company"><option></option></select>
+                                    <span class="input-group-btn">
+                                        <button type="button" id="addCompanyBtn" class="btn btn-default" title="Add a new company"><i class="fa fa-plus"></i></button>
+                                    </span>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="control-label" for="delay">Send Emails By (Optional)
-                                <i class="fa fa-question-circle" data-toggle="tooltip" data-placement="right" title="If specified, Gophish will send emails evenly between the campaign launch and this date."></i>
+                    </div>
+
+                    <!-- STEP 1 · Email template -->
+                    <div class="step-pane" data-step="1" hidden>
+                        <div class="step-head"><h4>Email Template</h4><p>Pick the phishing email targets will receive.</p></div>
+                        <div class="stack" id="templateChoices" style="gap:9px;"><div class="minilist-empty">Loading templates…</div></div>
+                    </div>
+
+                    <!-- STEP 2 · Landing page + listener URL -->
+                    <div class="step-pane" data-step="2" hidden>
+                        <div class="step-head"><h4>Landing Page</h4><p>Choose the page targets land on, then set the listener URL.</p></div>
+                        <div class="stack" id="pageChoices" style="gap:9px;"><div class="minilist-empty">Loading pages…</div></div>
+                        <hr class="divider">
+                        <div class="field">
+                            <label for="url">Listener URL
+                                <i class="fa fa-question-circle" data-toggle="tooltip" data-placement="right" title="Location of Gophish listener (must be reachable by targets!). Pick a saved URL or type a new one — new URLs are saved automatically for reuse across parallel campaigns."></i>
                             </label>
-                            <input type="text" class="form-control" id="send_by_date" autocomplete="random-data"/> <!--Chrome ignores autocomplete="off".-->
+                            <div class="input-group">
+                                <select class="form-control" id="url"><option></option></select>
+                                <span class="input-group-btn">
+                                    <button type="button" id="manageUrlsBtn" class="btn btn-default" title="Manage saved URLs"><i class="fa fa-cog"></i></button>
+                                </span>
+                            </div>
                         </div>
                     </div>
-                    <label class="control-label" for="profile">Sending Profile:</label>
-                    <div class="input-group">
-                        <select class="form-control" placeholder="Sending Profile" id="profile" />
-                        <option></option>
-                        </select>
-                        <span class="input-group-btn">
-                            <button type="button" data-toggle="modal" data-backdrop="static" data-target="#sendTestEmailModal"
-                                class="btn btn-primary button">
-                                <i class="fa fa-envelope"></i> Send Test Email</button>
-                        </span>
+
+                    <!-- STEP 3 · Sending profile -->
+                    <div class="step-pane" data-step="3" hidden>
+                        <div class="step-head"><h4>Sending Profile</h4><p>Select the SMTP profile used to deliver mail.</p></div>
+                        <div class="stack" id="profileChoices" style="gap:9px;"><div class="minilist-empty">Loading profiles…</div></div>
+                        <hr class="divider">
+                        <button type="button" data-toggle="modal" data-backdrop="static" data-target="#sendTestEmailModal" class="btn"><i class="fa fa-envelope"></i>&nbsp;Send Test Email</button>
                     </div>
-                    <label class="control-label" for="users">Groups:</label>
-                    <select class="form-control" id="users" multiple="multiple"></select>
+
+                    <!-- STEP 4 · Targets -->
+                    <div class="step-pane" data-step="4" hidden>
+                        <div class="step-head"><h4>Targets</h4><p>Choose which groups to include.</p></div>
+                        <div class="stack" id="groupChoices" style="gap:9px;"><div class="minilist-empty">Loading groups…</div></div>
+                        <div class="mono" id="recipientsNote" style="font-size:11.5px;color:var(--ink-dim);margin-top:8px;"></div>
+                    </div>
+
+                    <!-- STEP 5 · Schedule -->
+                    <div class="step-pane" data-step="5" hidden>
+                        <div class="step-head"><h4>Schedule</h4><p>Set the launch time and optional delivery window.</p></div>
+                        <div class="soc-grid-2" style="gap:12px;">
+                            <div class="field">
+                                <label for="launch_date">Launch date</label>
+                                <input type="text" class="form-control" id="launch_date" />
+                            </div>
+                            <div class="field">
+                                <label for="send_by_date">Send emails by <span class="hint">optional</span>
+                                    <i class="fa fa-question-circle" data-toggle="tooltip" data-placement="right" title="If specified, Gophish will send emails evenly between the campaign launch and this date."></i>
+                                </label>
+                                <input type="text" class="form-control" id="send_by_date" autocomplete="random-data"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STEP 6 · Review -->
+                    <div class="step-pane" data-step="6" hidden>
+                        <div class="step-head"><h4>Review</h4><p>Confirm everything, then launch.</p></div>
+                        <div class="sumcard" id="reviewSummary"></div>
+                    </div>
+                </div>
+
+                <!-- LIVE PREVIEW ASIDE -->
+                <div class="cx-aside">
+                    <span class="cx-label">Campaign preview</span>
+                    <div class="sumcard" id="previewSummary"></div>
+                    <span class="cx-label">Projected outcome · <span style="text-transform:none;letter-spacing:0;">industry estimate</span></span>
+                    <div class="projfunnel" id="previewFunnel"></div>
+                    <div class="mono" style="font-size:10.5px;color:var(--ink-faint);line-height:1.6;">
+                        Estimates apply typical open/click rates to your selected recipient count. Actuals update live once the campaign launches.
+                    </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-default" data-dismiss="modal" onclick="dismiss()">Close</button>
-                <button type="button" id="launchButton" class="btn btn-primary" onclick="launch()">
-                    <i class="fa fa-rocket"></i> Launch Campaign</button>
+            <div class="cx-foot">
+                <button type="button" class="btn btn-ghost" id="wizBack" onclick="wizBack()">Cancel</button>
+                <div class="grow"></div>
+                <span class="mono" id="wizCounter" style="font-size:10.5px;color:var(--ink-faint);margin-right:4px;"></span>
+                <button type="button" class="btn btn-primary" id="wizNext" onclick="wizNext()">Continue&nbsp;<i class="fa fa-chevron-right"></i></button>
+                <button type="button" id="launchButton" class="btn btn-primary" onclick="launch()" style="display:none;">
+                    <i class="fa fa-rocket"></i>&nbsp;Launch Campaign</button>
             </div>
         </div>
     </div>
 </div>
 <!-- Send Test Email Modal -->
-<div class="modal" id="sendTestEmailModal" tabindex="-1" role="dialog" aria-labelledby="modalLabel">
+<div class="modal cx sm" id="sendTestEmailModal" tabindex="-1" role="dialog" aria-labelledby="sendTestEmailModalTitle">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
-            <!-- New Email Modal -->
-            <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-                <h4 class="modal-title" id="sendTestEmailModalTitle">Send Test Email</h4>
+            <div class="cx-head">
+                <div class="hi"><i class="fa fa-envelope-o"></i></div>
+                <div style="min-width:0;">
+                    <h4 class="modal-title" id="sendTestEmailModalTitle">Send Test Email</h4>
+                    <p class="cx-sub">deliver a sample of this campaign to a recipient</p>
+                </div>
+                <button type="button" class="icon-btn cx-x" data-dismiss="modal" aria-label="Close"><i class="fa fa-times"></i></button>
             </div>
-            <div class="modal-body">
-                <div class="row" id="sendTestEmailModal.flashes"></div>
-                <div class="row">
-                    <div class="col-sm-12">
-                        <label class="control-label" for="to">Send Test Email to:</label>
-                    </div>
-                    <br>
-                    <div class="col-sm-2">
-                        <input type="text" class="form-control" placeholder="First Name" name="to_first_name">
-                    </div>
-                    <div class="col-sm-2">
-                        <input type="text" class="form-control" placeholder="Last Name" name="to_last_name">
-                    </div>
-                    <div class="col-sm-4">
-                        <input type="email" class="form-control" placeholder="Email" name="to_email" required>
-                    </div>
-                    <div class="col-sm-4">
-                        <input type="text" class="form-control" placeholder="Position" name="to_position">
+            <div class="cx-body">
+                <div class="cx-main">
+                    <div id="sendTestEmailModal.flashes" style="margin-bottom:14px;"></div>
+                    <div class="stack" style="gap:15px;">
+                        <div class="soc-grid-2" style="gap:12px;">
+                            <div class="field"><label>First name</label><input type="text" class="form-control" placeholder="First Name" name="to_first_name"></div>
+                            <div class="field"><label>Last name</label><input type="text" class="form-control" placeholder="Last Name" name="to_last_name"></div>
+                        </div>
+                        <div class="field"><label>Email</label><input type="email" class="form-control" placeholder="recipient@example.com" name="to_email" required></div>
+                        <div class="field"><label>Position</label><input type="text" class="form-control" placeholder="Position" name="to_position"></div>
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" data-dismiss="modal" class="btn btn-default">Cancel</button>
+            <div class="cx-foot">
+                <button type="button" data-dismiss="modal" class="btn btn-ghost">Cancel</button>
+                <div class="grow"></div>
                 <button type="button" class="btn btn-primary" id="sendTestModalSubmit" onclick="sendTestEmail()">
-                    <i class="fa fa-envelope"></i> Send</button>
+                    <i class="fa fa-envelope"></i>&nbsp;Send</button>
             </div>
         </div>
     </div>
