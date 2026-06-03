@@ -1,0 +1,62 @@
+{{define "body"}}
+<div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
+  <div class="canvas-inner fade-up">
+    <div id="flashes"></div>
+    <div class="soc-between" style="margin-bottom:18px;">
+        <div class="soc-section-title">Companies</div>
+        <button type="button" class="btn btn-primary" id="new_button" data-toggle="modal" data-backdrop="static"
+            data-company-id="-1" data-target="#modal">
+            <i class="fa fa-plus"></i>&nbsp;New Company</button>
+    </div>
+    <div id="loading">
+        <i class="fa fa-spinner fa-spin fa-4x"></i>
+    </div>
+    <div id="emptyMessage" style="display:none;">
+        <div class="alert alert-info">
+            No companies created yet. Create one to start grouping campaigns by company.
+        </div>
+    </div>
+    <div class="panel table-panel">
+        <table id="companyTable" class="table" style="display:none;">
+            <thead>
+                <tr>
+                    <th>Company</th>
+                    <th>Campaigns</th>
+                    <th>Last Modified</th>
+                    <th class="no-sort"></th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="modal" tabindex="-1" role="dialog" aria-labelledby="modalLabel">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+                <h4 class="modal-title" id="companyModalLabel">New Company</h4>
+            </div>
+            <div class="modal-body" id="modal_body">
+                <div class="row" id="modal.flashes"></div>
+                <label class="control-label" for="name">Name:</label>
+                <div class="form-group">
+                    <input type="text" class="form-control" placeholder="Company name" id="name" required autofocus />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="modalSubmit">Save changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+{{end}} {{define "scripts"}}
+<script src="/js/dist/app/companies.min.js"></script>
+{{end}}

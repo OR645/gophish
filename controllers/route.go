@@ -129,6 +129,7 @@ func (as *AdminServer) registerRoutes() {
 	router.HandleFunc("/reset_password", mid.Use(as.ResetPassword, mid.RequireLogin))
 	router.HandleFunc("/campaigns", mid.Use(as.Campaigns, mid.RequireLogin))
 	router.HandleFunc("/campaigns/{id:[0-9]+}", mid.Use(as.CampaignID, mid.RequireLogin))
+	router.HandleFunc("/companies", mid.Use(as.Companies, mid.RequireLogin))
 	router.HandleFunc("/templates", mid.Use(as.Templates, mid.RequireLogin))
 	router.HandleFunc("/groups", mid.Use(as.Groups, mid.RequireLogin))
 	router.HandleFunc("/landing_pages", mid.Use(as.LandingPages, mid.RequireLogin))
@@ -215,6 +216,13 @@ func (as *AdminServer) CampaignID(w http.ResponseWriter, r *http.Request) {
 	params := newTemplateParams(r)
 	params.Title = "Campaign Results"
 	getTemplate(w, "campaign_results").ExecuteTemplate(w, "base", params)
+}
+
+// Companies handles the companies management page
+func (as *AdminServer) Companies(w http.ResponseWriter, r *http.Request) {
+	params := newTemplateParams(r)
+	params.Title = "Companies"
+	getTemplate(w, "companies").ExecuteTemplate(w, "base", params)
 }
 
 // Templates handles the default path and template execution
