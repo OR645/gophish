@@ -46,8 +46,99 @@ function reportFindingSeverity(status) {
     }
 }
 
+// Timeline event -> Hebrew label / icon / color (matches the report palette).
+var REPORT_EVENT_INFO = {
+    "Campaign Created": { he: "הקמפיין נוצר", icon: "fa-rocket", color: "var(--accent)" },
+    "Email Sent": { he: "המייל נשלח", icon: "fa-paper-plane", color: "var(--low)" },
+    "Email Opened": { he: "המייל נפתח", icon: "fa-envelope-open", color: "var(--medium)" },
+    "Clicked Link": { he: "לחיצה על הקישור", icon: "fa-mouse-pointer", color: "var(--high)" },
+    "Submitted Data": { he: "הזנת נתונים", icon: "fa-exclamation-triangle", color: "var(--critical)" },
+    "Email Reported": { he: "המייל דווח", icon: "fa-bullhorn", color: "var(--good)" }
+}
+
+// Escape a string for use inside a double-quoted HTML attribute (iframe srcdoc).
+function reportAttrEscape(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;")
+}
+
+// fetchImageAsDataURL - loads an image (same-origin) and returns a base64 data
+// URI so the generated report is fully self-contained (logo survives save/print).
+function fetchImageAsDataURL(url) {
+    return fetch(url)
+        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.blob() })
+        .then(function (blob) {
+            return new Promise(function (resolve, reject) {
+                var fr = new FileReader()
+                fr.onload = function () { resolve(fr.result) }
+                fr.onerror = reject
+                fr.readAsDataURL(blob)
+            })
+        })
+}
+
+// renderReportPayload - renders the credentials a target submitted (password
+// values masked) plus the source IP, for the high-risk timeline.
+function renderReportPayload(detailsJson) {
+    var details
+    try { details = JSON.parse(detailsJson) } catch (e) { return "" }
+    if (!details) return ""
+    var rows = ""
+    if (details.browser && details.browser.address) {
+        rows += '<tr><td>כתובת IP</td><td>' + escapeHtml(details.browser.address) + '</td></tr>'
+    }
+    if (details.payload) {
+        Object.keys(details.payload).forEach(function (param) {
+            if (param === "rid") return
+            var val = details.payload[param]
+            if (Array.isArray(val)) val = val.join(", ")
+            if (/pass/i.test(param)) val = "••••••••"
+            rows += '<tr><td>' + escapeHtml(param) + '</td><td>' + escapeHtml(val) + '</td></tr>'
+        })
+    }
+    if (!rows) return ""
+    return '<table class="rt-payload"><thead><tr><th>שדה</th><th>ערך שהוזן</th></tr></thead><tbody>' + rows + '</tbody></table>'
+}
+
+// buildHighRiskTimeline - builds the event timeline for the highest-risk target
+// (the first entry of the risk-sorted results), used in section 4.4.
+function buildHighRiskTimeline(campaign, sortedResults) {
+    if (!sortedResults || !sortedResults.length) {
+        return '<div class="preview-empty">אין נתוני משתתפים בקמפיין</div>'
+    }
+    var top = sortedResults[0]
+    var fullName = top.last_name ? (top.first_name + " " + top.last_name) : (top.first_name || top.email)
+    var sev = reportFindingSeverity(top.status)
+    var header = '<div class="rt-head"><span class="severity-badge severity-' + sev.Class + '">' + sev.Text + '</span> ' +
+        '<strong>' + escapeHtml(fullName) + '</strong> <span style="color:var(--text-light);">(' + escapeHtml(top.email || "") + ')</span></div>'
+
+    var events = (campaign.timeline || []).filter(function (e) { return e.email === top.email })
+    events.sort(function (a, b) { return new Date(a.time) - new Date(b.time) })
+    if (!events.length) {
+        return header + '<div class="preview-empty">לא נרשמו אירועים עבור משתמש זה</div>'
+    }
+    var items = events.map(function (e) {
+        var info = REPORT_EVENT_INFO[e.message] || { he: e.message, icon: "fa-circle", color: "var(--text-light)" }
+        var when = reportHebrewDate(e.time) + " · " + new Date(e.time).toLocaleTimeString("he-IL")
+        var extra = (e.message === "Submitted Data" && e.details) ? renderReportPayload(e.details) : ""
+        return '<div class="rt-item">' +
+            '<span class="rt-dot" style="background:' + info.color + '"><i class="fas ' + info.icon + '"></i></span>' +
+            '<div class="rt-body"><div class="rt-title">' + info.he + '</div>' +
+            '<div class="rt-time">' + when + '</div>' + extra + '</div></div>'
+    }).join("")
+    return header + '<div class="risk-timeline">' + items + '</div>'
+}
+
+// buildPreviewIframe - renders arbitrary HTML (email body / landing page) inside
+// a sandboxed iframe so it appears as a live "screenshot" in the report.
+function buildPreviewIframe(html, isHtml, emptyMsg) {
+    if (!html) return '<div class="preview-empty">' + emptyMsg + '</div>'
+    var doc = isHtml ? html : '<pre style="white-space:pre-wrap;font-family:monospace;padding:16px;margin:0;">' + escapeHtml(html) + '</pre>'
+    return '<iframe class="preview-frame" sandbox srcdoc="' + reportAttrEscape(doc) + '"></iframe>'
+}
+
 // buildPhishingReportHTML - returns the full standalone HTML document string.
-function buildPhishingReportHTML(campaign, companyName) {
+// logoDataUrl is an optional base64 data URI for the Yazamco logo.
+function buildPhishingReportHTML(campaign, companyName, logoDataUrl) {
     var launchDate = reportHebrewDate(campaign.launch_date)
     var phishingUrl = campaign.url || ""
 
@@ -80,6 +171,17 @@ function buildPhishingReportHTML(campaign, companyName) {
         if (oa !== ob) return oa - ob
         return (a.first_name || "").localeCompare(b.first_name || "")
     })
+
+    // Logo (data URI keeps the report self-contained), live previews and the
+    // high-risk timeline that replace the manual screenshot placeholders.
+    var logoTag = logoDataUrl
+        ? '<img src="' + logoDataUrl + '" alt="Yazamco pro Cyber" style="max-width:380px; height:auto;">'
+        : '<h2 style="color:var(--primary);margin:0;font-size:2.2rem;">Yazamco pro Cyber</h2>'
+
+    var tmpl = campaign.template || {}
+    var emailPreview = buildPreviewIframe(tmpl.html || tmpl.text || "", !!tmpl.html, "לא הוגדר תוכן למייל בקמפיין זה")
+    var pagePreview = buildPreviewIframe((campaign.page || {}).html || "", true, "לא הוגדר דף נחיתה בקמפיין זה")
+    var highRiskTimeline = buildHighRiskTimeline(campaign, sortedResults)
 
     var employeeRows = sortedResults.map(function (result) {
         var fullName = result.last_name ? (result.first_name + " " + result.last_name) : (result.first_name || "")
@@ -393,6 +495,99 @@ function buildPhishingReportHTML(campaign, companyName) {
         }
 
 
+        /* Inline previews (replace the manual screenshot placeholders) */
+        .preview-frame {
+            width: 100%;
+            height: 640px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: #fff;
+            margin: 10px 0;
+        }
+
+        .preview-empty {
+            background: var(--bg-light);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            color: var(--text-light);
+            font-style: italic;
+            margin: 10px 0;
+        }
+
+        /* High-risk user timeline */
+        .rt-head {
+            margin-bottom: 18px;
+            font-size: 1rem;
+        }
+
+        .risk-timeline {
+            position: relative;
+            padding-right: 8px;
+        }
+
+        .rt-item {
+            position: relative;
+            display: flex;
+            gap: 14px;
+            padding-bottom: 22px;
+        }
+
+        .rt-item:before {
+            content: "";
+            position: absolute;
+            top: 30px;
+            right: 14px;
+            bottom: -4px;
+            width: 2px;
+            background: var(--border);
+        }
+
+        .rt-item:last-child:before {
+            display: none;
+        }
+
+        .rt-dot {
+            flex: 0 0 30px;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 0.85rem;
+            z-index: 1;
+        }
+
+        .rt-body {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .rt-title {
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .rt-time {
+            font-size: 0.82rem;
+            color: var(--text-light);
+            margin-top: 2px;
+        }
+
+        .rt-payload {
+            margin-top: 10px;
+            max-width: 480px;
+            font-size: 0.82rem;
+        }
+
+        .rt-payload th {
+            background: var(--primary);
+            color: #fff;
+        }
+
         /* Print styles */
         @media print {
             body {
@@ -414,9 +609,8 @@ function buildPhishingReportHTML(campaign, companyName) {
     <!-- Cover Page -->
     <div style="page-break-after:always; display:flex; flex-direction:column; min-height:100vh; background:#fff; text-align:center; padding:2rem;">
         <!-- Logo at top -->
-            <!-- Logo at top -->
             <div style="margin-bottom:auto;">
-                <img src="https://yazamcocoil.sharepoint.com/:i:/s/AutomationManagement/EV4-FIGEOPZDpBNVdA23kQwBwl0N2QUYO7GqzZNtuhHUPw?e=x9J3g9&download=1" alt="CyPro Logo" style="max-width:350px; height:auto;">
+                ${logoTag}
             </div>
         <!-- Title in center -->
         <div style="margin:auto;">
@@ -618,11 +812,8 @@ function buildPhishingReportHTML(campaign, companyName) {
                     </table>
                 </div>
                 <div style="page-break-inside: avoid;">
-                <h3>4.4 תיאור גרפי של תוצאות המבדק</h3>
-                    <div class="image-placeholder">
-                        הוסף כאן גרף המציג את תוצאות המבדק<br>
-                        (גרף עוגה או בר המציג את התפלגות התוצאות)
-                    </div>
+                <h3>4.4 ציר זמן של המשתמש בסיכון הגבוה ביותר</h3>
+                    ${highRiskTimeline}
                 </div>
 
             </div>
@@ -660,20 +851,16 @@ function buildPhishingReportHTML(campaign, companyName) {
             <div class="section-content">
                     <div style="page-break-inside: avoid;">
                     <h3>6.1 שלב 1: הודעת הדואר האלקטרוני</h3>
-                    <p>הודעת דואר אלקטרוני המדמה הודעת פישינג נפוצה נשלחה לעובדים, ובהודעה היה קישור לדף הזדהות מזויף.</p>
-                    <div class="image-placeholder">
-                        הוסף כאן צילום מסך של הודעת הדואר האלקטרוני
-                    </div>
+                    <p>הודעת דואר אלקטרוני המדמה הודעת פישינג נפוצה נשלחה לעובדים, ובהודעה היה קישור לדף הזדהות מזויף. להלן תצוגת הודעת הדואר שנשלחה במסגרת המבדק:</p>
+                    ${emailPreview}
                 </div>
                 <h3>6.2 שלב 3: לחיצה על הקישור</h3>
                 <p>${linksClicked} עובדים מתוך ${emailsOpened} שפתחו את ההודעה לחצו על הקישור שבהודעה.</p>
 
                 <div style="page-break-inside: avoid;">
                     <h3>6.3 שלב 4: דף הנחיתה</h3>
-                    <p>העובדים שלחצו על הקישור הגיעו לדף מזויף, ובדף זה התבקשו למלא את פרטי ההזדהות שלהם. יש לציין שכתובת האתר אינה מאובטחת כפי שמאובטחים אתרים המבקשים פרטים אישיים.</p>
-                    <div class="image-placeholder">
-                        הוסף כאן צילום מסך של דף הנחיתה המזויף
-                    </div>
+                    <p>העובדים שלחצו על הקישור הגיעו לדף מזויף, ובדף זה התבקשו למלא את פרטי ההזדהות שלהם. יש לציין שכתובת האתר אינה מאובטחת כפי שמאובטחים אתרים המבקשים פרטים אישיים. להלן תצוגת דף הנחיתה שהוגדר במבדק:</p>
+                    ${pagePreview}
                 </div>
 
                 <h3>6.4 שלב 5: הזנת נתונים</h3>
@@ -754,60 +941,6 @@ ${employeeRows}                        </tbody>
 
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const placeholders = document.querySelectorAll('.image-placeholder');
-
-            placeholders.forEach(placeholder => {
-                // יצירת input
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = 'image/*';
-                input.style.position = 'absolute';
-                input.style.width = '100%';
-                input.style.height = '100%';
-                input.style.top = '0';
-                input.style.left = '0';
-                input.style.opacity = '0';
-                input.style.cursor = 'pointer';
-
-                // יצירת img
-                const img = document.createElement('img');
-                img.style.maxWidth = '100%';
-                img.style.height = 'auto';
-                img.style.display = 'none';
-
-                // שמירת טקסט הפלייסהולדר
-                const originalText = placeholder.innerHTML;
-                const textSpan = document.createElement('span');
-                textSpan.className = 'placeholder-text';
-                textSpan.innerHTML = originalText;
-
-                placeholder.innerHTML = '';
-                placeholder.appendChild(textSpan);
-                placeholder.appendChild(img);
-                placeholder.appendChild(input);
-
-                // בחירת קובץ
-                input.addEventListener('change', function (e) {
-                    const file = e.target.files[0];
-                    if (!file || !file.type.startsWith('image/')) return;
-
-                    const reader = new FileReader();
-                    reader.onload = function (ev) {
-                        img.src = ev.target.result;
-                        img.style.display = 'block';
-
-                        // העלמת הפלייסהולדר
-                        placeholder.classList.add('has-image');
-                    };
-                    reader.readAsDataURL(file);
-                });
-            });
-        });
-    </script>
-
-
 </body>
 </html>`
 }
@@ -830,28 +963,41 @@ function openReportWindow(html) {
     setTimeout(function () { URL.revokeObjectURL(url) }, 60000)
 }
 
-// promptCompanyAndOpen - asks for the company name, then builds & opens the report.
+// promptCompanyAndOpen - asks for the company name (themed to match the SOC
+// console UI), loads the logo, then builds & opens the report.
 function promptCompanyAndOpen(campaign) {
     Swal.fire({
-        title: "הפקת דוח פישינג",
-        text: "קמפיין: " + campaign.name,
+        title: "Generate Report",
+        text: "Campaign: " + campaign.name,
         input: "text",
-        inputPlaceholder: "הזן את שם החברה",
+        inputPlaceholder: "Enter the company name",
+        inputClass: "form-control",
         showCancelButton: true,
-        confirmButtonText: "הפק דוח",
-        cancelButtonText: "ביטול",
-        confirmButtonColor: "#428bca",
+        confirmButtonText: "Generate Report",
+        cancelButtonText: "Cancel",
+        buttonsStyling: false,
+        confirmButtonClass: "btn btn-primary",
+        cancelButtonClass: "btn btn-default",
+        customClass: "report-modal",
         reverseButtons: true,
         allowOutsideClick: false,
         inputValidator: function (value) {
             if (!value) {
-                return "יש להזין שם חברה"
+                return "Please enter a company name"
             }
         }
     }).then(function (result) {
-        if (result.value) {
-            openReportWindow(buildPhishingReportHTML(campaign, result.value))
-        }
+        if (!result.value) return
+        var companyName = result.value
+        // Load the logo as a data URI so the report is self-contained; build
+        // regardless of whether the logo resolves.
+        fetchImageAsDataURL("/images/yazamco-logo.png")
+            .then(function (dataUrl) {
+                openReportWindow(buildPhishingReportHTML(campaign, companyName, dataUrl))
+            })
+            .catch(function () {
+                openReportWindow(buildPhishingReportHTML(campaign, companyName, null))
+            })
     })
 }
 
