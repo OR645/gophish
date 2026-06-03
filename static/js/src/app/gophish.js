@@ -149,6 +149,32 @@ var api = {
             return query("/groups/" + id, "DELETE", {}, false)
         }
     },
+    // companies contains the endpoints for /companies
+    companies: {
+        // get() - Queries the API for GET /companies
+        get: function () {
+            return query("/companies/", "GET", {}, false)
+        },
+        // post() - Posts a company to POST /companies
+        post: function (company) {
+            return query("/companies/", "POST", company, false)
+        }
+    },
+    // companyId contains the endpoints for /companies/:id
+    companyId: {
+        // get() - Queries the API for GET /companies/:id
+        get: function (id) {
+            return query("/companies/" + id, "GET", {}, false)
+        },
+        // put() - Puts a company to PUT /companies/:id
+        put: function (company) {
+            return query("/companies/" + company.id, "PUT", company, false)
+        },
+        // delete() - Deletes a company at DELETE /companies/:id
+        delete: function (id) {
+            return query("/companies/" + id, "DELETE", {}, false)
+        }
+    },
     // templates contains the endpoints for /templates
     templates: {
         // get() - Queries the API for GET /templates

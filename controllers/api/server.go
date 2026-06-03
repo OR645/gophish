@@ -73,6 +73,8 @@ func (as *Server) registerRoutes() {
 	router.HandleFunc("/groups/summary", as.GroupsSummary)
 	router.HandleFunc("/groups/{id:[0-9]+}", as.Group)
 	router.HandleFunc("/groups/{id:[0-9]+}/summary", as.GroupSummary)
+	router.HandleFunc("/companies/", as.Companies)
+	router.HandleFunc("/companies/{id:[0-9]+}", as.Company)
 	router.HandleFunc("/templates/", as.Templates)
 	router.HandleFunc("/templates/{id:[0-9]+}", as.Template)
 	router.HandleFunc("/pages/", as.Pages)

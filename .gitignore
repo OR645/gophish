@@ -30,3 +30,4 @@ gophish_admin.key
 gophish.db*
 gophish
 /new_gophish
+/deploy

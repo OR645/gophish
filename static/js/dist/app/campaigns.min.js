@@ -134,6 +134,34 @@ function campaignMiniFunnel(f) {
     }).join("") + '</div>'
 }
 
+// Populate the #companyFilter dropdown with the distinct companies present in
+// the campaign list, and wire it to filter both DataTables by the company
+// column (index 1).
+function buildCompanyFilter(cs) {
+    var companies = []
+    $.each(cs, function (i, c) {
+        if (c.company && companies.indexOf(c.company) === -1) {
+            companies.push(c.company)
+        }
+    })
+    companies.sort()
+    var $filter = $("#companyFilter")
+    $filter.find("option").not("[value='']").remove()
+    $.each(companies, function (i, name) {
+        $filter.append(new Option(name, name))
+    })
+    $filter.off("change.companyfilter").on("change.companyfilter", function () {
+        var val = $(this).val()
+        var search = val ? "^" + $.fn.dataTable.util.escapeRegex(val) + "$" : ""
+        if (typeof activeCampaignsTable !== "undefined") {
+            activeCampaignsTable.column(1).search(search, true, false).draw()
+        }
+        if (typeof archivedCampaignsTable !== "undefined") {
+            archivedCampaignsTable.column(1).search(search, true, false).draw()
+        }
+    })
+}
+
 // Build a full <tr> for the campaign list (DOM-sourced DataTable; data-order
 // attributes drive correct sorting on each column).
 function campaignRowHtml(campaign, idx) {
@@ -152,9 +180,14 @@ function campaignRowHtml(campaign, idx) {
             "<br><br>Emails clicked: " + s.clicked + "<br><br>Submitted Credentials: " + s.submitted_data +
             "<br><br>Errors : " + s.error + "<br><br>Reported : " + s.email_reported
     }
+    var company = campaign.company || ""
+    var companyCell = company
+        ? '<span class="pill pill-active" style="background:rgba(120,140,170,.14);">' + escapeHtml(company) + '</span>'
+        : '<span style="color:var(--ink-faint);">—</span>'
     return '<tr>' +
         '<td class="strong"><a href="/campaigns/' + campaign.id + '" style="color:inherit;text-decoration:none;">' + escapeHtml(campaign.name) + '</a>' +
         '<div class="mono" style="font-size:10.5px;color:var(--ink-faint);font-weight:400;">CMP-' + campaign.id + '</div></td>' +
+        '<td data-order="' + escapeHtml(company) + '">' + companyCell + '</td>' +
         '<td data-order="' + escapeHtml(campaign.status) + '">' + campaignStatusPill(campaign.status, quickStats) + '</td>' +
         '<td class="num" data-order="' + epoch + '">' + date + '</td>' +
         '<td class="num strong" data-order="' + (s.sent || 0) + '">' + (s.sent || 0) + '</td>' +
@@ -231,6 +264,7 @@ function launch() {
                     launch_date: moment($("#launch_date").val(), "MMMM Do YYYY, h:mm a").utc().format(),
                     send_by_date: send_by_date || null,
                     groups: groups,
+                    company_id: parseInt($("#company").val(), 10) || 0,
                 }
                 // Remember this URL so it can be reused for parallel campaigns
                 saveURL(campaign.url)
@@ -304,6 +338,7 @@ function dismiss() {
     $("#url").val(null).trigger("change");
     $("#profile").val("").change();
     $("#users").val("").change();
+    $("#company").val(null).trigger("change");
     $("#modal").modal('hide');
 }
 
@@ -350,8 +385,35 @@ function deleteCampaign(idx) {
     })
 }
 
+// loadCompanies populates the #company select2 in the campaign modal. If
+// selectedId is provided, that company is preselected (used when copying a
+// campaign or just after creating a new company inline).
+function loadCompanies(selectedId) {
+    api.companies.get()
+        .success(function (companies) {
+            var company_s2 = $.map(companies, function (obj) {
+                obj.text = obj.name
+                return obj
+            })
+            var $company = $("#company")
+            if ($company.hasClass("select2-hidden-accessible")) {
+                $company.select2("destroy")
+            }
+            $company.empty().append("<option></option>")
+            $company.select2({
+                placeholder: "No company",
+                allowClear: true,
+                data: company_s2
+            })
+            if (selectedId) {
+                $company.val(selectedId.toString()).trigger("change.select2")
+            }
+        })
+}
+
 function setupOptions() {
     setupURLSelect()
+    loadCompanies()
     api.groups.summary()
         .success(function (summaries) {
             groups = summaries.groups
@@ -474,6 +536,9 @@ function copy(idx) {
                 $("#profile").trigger("change.select2")
             }
             setURLValue(campaign.url)
+            if (campaign.company_id) {
+                loadCompanies(campaign.company_id)
+            }
         })
         .error(function (data) {
             $("#modal\\.flashes").empty().append("<div style=\"text-align:center\" class=\"alert alert-danger\">\
@@ -529,6 +594,41 @@ $(document).ready(function () {
         dismiss()
     });
     $("#manageUrlsBtn").on("click", manageURLs);
+    // Add a new company inline from the campaign modal.
+    $("#addCompanyBtn").on("click", function () {
+        Swal.fire({
+            title: "New Company",
+            input: "text",
+            inputPlaceholder: "Company name",
+            showCancelButton: true,
+            confirmButtonText: "Add",
+            confirmButtonColor: "#428bca",
+            reverseButtons: true,
+            allowOutsideClick: false,
+            showLoaderOnConfirm: true,
+            preConfirm: function (name) {
+                name = $.trim(name || "")
+                if (name === "") {
+                    Swal.showValidationMessage("Please enter a company name")
+                    return false
+                }
+                return new Promise(function (resolve) {
+                    api.companies.post({ name: name })
+                        .success(function (data) {
+                            resolve(data)
+                        })
+                        .error(function (data) {
+                            Swal.showValidationMessage(data.responseJSON.message)
+                            resolve(false)
+                        })
+                })
+            }
+        }).then(function (result) {
+            if (result.value) {
+                loadCompanies(result.value.id)
+            }
+        })
+    });
     api.campaigns.summary()
         .success(function (data) {
             campaigns = data.campaigns
@@ -552,11 +652,12 @@ $(document).ready(function () {
                 $("#campaignTableArchive").show()
                 var dtOpts = {
                     columnDefs: [{ orderable: false, targets: "no-sort" }],
-                    order: [[2, "desc"]]
+                    order: [[3, "desc"]]
                 }
                 activeCampaignsTable = $("#campaignTable").DataTable(dtOpts)
                 archivedCampaignsTable = $("#campaignTableArchive").DataTable(dtOpts)
                 if (!archivedRows.length) { $("#emptyMessageArchive").show() }
+                buildCompanyFilter(campaigns)
                 $('[data-toggle="tooltip"]').tooltip()
             } else {
                 $("#emptyMessage").show()

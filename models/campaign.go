@@ -31,6 +31,7 @@ type Campaign struct {
 	SMTPId        int64     `json:"-"`
 	SMTP          SMTP      `json:"smtp"`
 	URL           string    `json:"url"`
+	CompanyId     int64     `json:"company_id"`
 }
 
 // CampaignResults is a struct representing the results from a campaign
@@ -57,6 +58,8 @@ type CampaignSummary struct {
 	CompletedDate time.Time     `json:"completed_date"`
 	Status        string        `json:"status"`
 	Name          string        `json:"name"`
+	CompanyId     int64         `json:"company_id"`
+	Company       string        `json:"company"`
 	Stats         CampaignStats `json:"stats"`
 }
 
@@ -121,6 +124,9 @@ var ErrPageNotFound = errors.New("Page not found")
 
 // ErrSMTPNotFound indicates a sending profile specified by the user does not exist in the database
 var ErrSMTPNotFound = errors.New("Sending profile not found")
+
+// ErrCompanyNotFound indicates a company specified by the user does not exist in the database
+var ErrCompanyNotFound = errors.New("Company not found")
 
 // ErrInvalidSendByDate indicates that the user specified a send by date that occurs before the
 // launch date
@@ -331,9 +337,10 @@ func GetCampaignSummaries(uid int64) (CampaignSummaries, error) {
 	// Get the basic campaign information
 	query := db.Table("campaigns")
 	if !userIsAdmin(uid) {
-		query = query.Where("user_id = ?", uid)
+		query = query.Where("campaigns.user_id = ?", uid)
 	}
-	query = query.Select("id, name, created_date, launch_date, send_by_date, completed_date, status")
+	query = query.Joins("left join companies on companies.id = campaigns.company_id")
+	query = query.Select("campaigns.id, campaigns.name, campaigns.created_date, campaigns.launch_date, campaigns.send_by_date, campaigns.completed_date, campaigns.status, campaigns.company_id, companies.name as company")
 	err := query.Scan(&cs).Error
 	if err != nil {
 		log.Error(err)
@@ -355,11 +362,12 @@ func GetCampaignSummaries(uid int64) (CampaignSummaries, error) {
 // GetCampaignSummary gets the summary object for a campaign specified by the campaign ID
 func GetCampaignSummary(id int64, uid int64) (CampaignSummary, error) {
 	cs := CampaignSummary{}
-	query := db.Table("campaigns").Where("id = ?", id)
+	query := db.Table("campaigns").Where("campaigns.id = ?", id)
 	if !userIsAdmin(uid) {
-		query = query.Where("user_id = ?", uid)
+		query = query.Where("campaigns.user_id = ?", uid)
 	}
-	query = query.Select("id, name, created_date, launch_date, send_by_date, completed_date, status")
+	query = query.Joins("left join companies on companies.id = campaigns.company_id")
+	query = query.Select("campaigns.id, campaigns.name, campaigns.created_date, campaigns.launch_date, campaigns.send_by_date, campaigns.completed_date, campaigns.status, campaigns.company_id, companies.name as company")
 	err := query.Scan(&cs).Error
 	if err != nil {
 		log.Error(err)
@@ -552,6 +560,16 @@ func PostCampaign(c *Campaign, uid int64) error {
 	}
 	c.SMTP = s
 	c.SMTPId = s.Id
+	// Check to make sure the company, if specified, exists and belongs to the user
+	if c.CompanyId != 0 {
+		_, err = GetCompany(c.CompanyId, uid)
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"company_id": c.CompanyId,
+			}).Error("Company does not exist")
+			return ErrCompanyNotFound
+		}
+	}
 	// Insert into the DB
 	err = db.Save(c).Error
 	if err != nil {
