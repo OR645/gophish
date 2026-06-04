@@ -1,0 +1,1687 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Gophish API (Yazamco SOC Edition)",
+    "description": "REST API for this Gophish instance, including all Yazamco-specific extensions: **Companies** (Hudu-backed organizations), **Domains** (n8n / Cloudflare / Microsoft 365 provisioning), **template rotation pools**, **per-recipient email subjects**, **resend** endpoints and the **spam-report** webhook trigger.\n\n## Authentication\nEvery endpoint requires your personal API key, found under **Account Settings**. Supply it one of two ways:\n\n- `Authorization: Bearer <API_KEY>` header (recommended)\n- `?api_key=<API_KEY>` query parameter\n\n## Permissions\n- Users with the **user** role can manage only the objects they own; **admin** users see everything.\n- Endpoints marked *admin only* require the `modify_system` permission (User Management, Webhooks).\n- Accounts in *view-only* mode may only issue GET requests.\n\n## Conventions\n- All write endpoints accept and return `application/json` (except group CSV import, which is `multipart/form-data`).\n- Dates are RFC 3339 / ISO-8601 with timezone, e.g. `2026-06-04T09:30:00+03:00`. The zero date `0001-01-01T00:00:00Z` means \"not set\".\n- Errors return a `GenericResponse` envelope: `{\"message\": \"...\", \"success\": false, \"data\": null}`.",
+    "version": "1.1-yazamco",
+    "contact": {
+      "name": "Yazamco Pro Cyber"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://github.com/gophish/gophish/blob/master/LICENSE"
+    }
+  },
+  "servers": [
+    {
+      "url": "/api",
+      "description": "This Gophish instance"
+    }
+  ],
+  "security": [
+    { "BearerAuth": [] },
+    { "ApiKeyQuery": [] }
+  ],
+  "tags": [
+    { "name": "Campaigns", "description": "Create, monitor, resend and complete phishing campaigns" },
+    { "name": "Results", "description": "Per-recipient campaign results, resends and the spam-report webhook" },
+    { "name": "Groups", "description": "Target groups (recipients)" },
+    { "name": "Companies", "description": "Organizations campaigns are attributed to. Synced from Hudu via the n8n hudu-companies webhook" },
+    { "name": "Domains", "description": "Sending / landing domains. Creating a domain dispatches an n8n webhook that provisions DNS (Cloudflare) and optionally Microsoft 365 records" },
+    { "name": "Templates", "description": "Email templates, including attachments and template variables" },
+    { "name": "Landing Pages", "description": "Phishing landing pages with optional credential capture" },
+    { "name": "Sending Profiles", "description": "SMTP sending profiles" },
+    { "name": "Users", "description": "User management (admin only for the collection endpoints)" },
+    { "name": "Webhooks", "description": "Outbound event webhooks (admin only)" },
+    { "name": "IMAP", "description": "IMAP account used to detect user-reported phishing emails" },
+    { "name": "Import", "description": "Helpers for importing groups (CSV), raw emails and cloning sites" },
+    { "name": "Utilities", "description": "Test emails and API key reset" }
+  ],
+  "paths": {
+    "/campaigns/": {
+      "get": {
+        "tags": ["Campaigns"],
+        "summary": "List campaigns",
+        "description": "Returns all campaigns visible to the authenticated user (admins see every user's campaigns), including full results and timeline for each. For dashboards prefer `/campaigns/summary`, which is much lighter.",
+        "operationId": "getCampaigns",
+        "responses": {
+          "200": {
+            "description": "A list of campaigns",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Campaign" } }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Campaigns"],
+        "summary": "Create and launch a campaign",
+        "description": "Creates a new campaign. Referenced objects (template(s), page, groups, sending profile) are looked up **by name** and must already exist.\n\n- If `launch_date` is omitted or in the past, the campaign launches **immediately**.\n- If `launch_date` is in the future the campaign is queued (`status: Queued`) and the background worker launches it on time.\n- If `send_by_date` is set, email sending is spread evenly between `launch_date` and `send_by_date`.\n- **Template rotation (Yazamco extension):** provide multiple templates in `templates[]` and each recipient is randomly assigned one of them at launch. `template` may be omitted when `templates` is provided; the first pool entry is kept in `template` for compatibility.\n- `company_id` attributes the campaign to a Company (used in reports and the spam-report webhook).",
+        "operationId": "createCampaign",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CampaignRequest" },
+              "examples": {
+                "immediate": {
+                  "summary": "Launch immediately, single template",
+                  "value": {
+                    "name": "Q3 Awareness - Acme",
+                    "template": { "name": "Password Reset" },
+                    "page": { "name": "O365 Login" },
+                    "groups": [ { "name": "Acme Employees" } ],
+                    "smtp": { "name": "Acme Mailer" },
+                    "url": "https://login.acme-portal.com",
+                    "company_id": 3
+                  }
+                },
+                "scheduledRotation": {
+                  "summary": "Scheduled launch with template rotation",
+                  "value": {
+                    "name": "Q3 Awareness - Rotation",
+                    "templates": [ { "name": "Password Reset" }, { "name": "Shared Document" }, { "name": "Payroll Update" } ],
+                    "page": { "name": "O365 Login" },
+                    "groups": [ { "name": "Acme Employees" } ],
+                    "smtp": { "name": "Acme Mailer" },
+                    "url": "https://login.acme-portal.com",
+                    "launch_date": "2026-06-10T08:00:00+03:00",
+                    "send_by_date": "2026-06-10T12:00:00+03:00",
+                    "company_id": 3
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Campaign created (and launched/queued)",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Campaign" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/campaigns/summary": {
+      "get": {
+        "tags": ["Campaigns"],
+        "summary": "Summary of all campaigns",
+        "description": "Lightweight overview of every visible campaign: status, dates, attributed company and aggregate stats. No per-recipient data.",
+        "operationId": "getCampaignsSummary",
+        "responses": {
+          "200": {
+            "description": "Campaign summaries",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CampaignSummaries" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/campaigns/{id}": {
+      "parameters": [ { "$ref": "#/components/parameters/CampaignId" } ],
+      "get": {
+        "tags": ["Campaigns"],
+        "summary": "Get a campaign",
+        "description": "Returns full campaign details including results and the event timeline.",
+        "operationId": "getCampaign",
+        "responses": {
+          "200": { "description": "The campaign", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Campaign" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["Campaigns"],
+        "summary": "Delete a campaign",
+        "description": "Permanently deletes the campaign, its results, events and queued emails. **Irreversible.**",
+        "operationId": "deleteCampaign",
+        "responses": {
+          "200": { "$ref": "#/components/responses/GenericSuccess" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/campaigns/{id}/results": {
+      "parameters": [ { "$ref": "#/components/parameters/CampaignId" } ],
+      "get": {
+        "tags": ["Results"],
+        "summary": "Get campaign results only",
+        "description": "Returns just the per-recipient results and event timeline — significantly less data than fetching the full campaign (no template/page/SMTP bodies).",
+        "operationId": "getCampaignResults",
+        "responses": {
+          "200": { "description": "Results and timeline", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CampaignResults" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/campaigns/{id}/summary": {
+      "parameters": [ { "$ref": "#/components/parameters/CampaignId" } ],
+      "get": {
+        "tags": ["Campaigns"],
+        "summary": "Get a campaign summary",
+        "description": "Aggregate stats for a single campaign (sent / opened / clicked / submitted / reported / errors).",
+        "operationId": "getCampaignSummary",
+        "responses": {
+          "200": { "description": "The summary", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CampaignSummary" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/campaigns/{id}/complete": {
+      "parameters": [ { "$ref": "#/components/parameters/CampaignId" } ],
+      "get": {
+        "tags": ["Campaigns"],
+        "summary": "Complete a campaign",
+        "description": "Marks the campaign as **Completed**. No further emails are sent; subsequent clicks on phishing links return a 404 page. (Note: this is a GET request for historical compatibility.)",
+        "operationId": "completeCampaign",
+        "responses": {
+          "200": { "$ref": "#/components/responses/GenericSuccess" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/campaigns/{id}/results/resend": {
+      "parameters": [ { "$ref": "#/components/parameters/CampaignId" } ],
+      "post": {
+        "tags": ["Results"],
+        "summary": "Resend to multiple recipients (Yazamco extension)",
+        "description": "Re-sends the phishing email to the selected recipients of a campaign. Each recipient keeps their originally-assigned template (rotation pools are respected). Invalid result IDs are skipped; the response reports how many emails were queued. Sending is asynchronous.",
+        "operationId": "resendResults",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ResendRequest" },
+              "example": { "ids": ["b7c9d2e", "a1f4g8h"] }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Emails queued",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericResponse" }, "example": { "message": "Queued 2 email(s) to be resent", "success": true, "data": null } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" }
+        }
+      }
+    },
+    "/campaigns/{id}/results/{rid}/resend": {
+      "parameters": [
+        { "$ref": "#/components/parameters/CampaignId" },
+        {
+          "name": "rid",
+          "in": "path",
+          "required": true,
+          "description": "The recipient's result ID (`Result.id`, e.g. `b7c9d2e`) — **not** a numeric row id.",
+          "schema": { "type": "string" }
+        }
+      ],
+      "post": {
+        "tags": ["Results"],
+        "summary": "Resend to a single recipient (Yazamco extension)",
+        "description": "Re-sends the phishing email to one recipient. The result must belong to the campaign. Sending is asynchronous.",
+        "operationId": "resendResult",
+        "responses": {
+          "200": {
+            "description": "Email queued",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericResponse" }, "example": { "message": "Email queued to be resent", "success": true, "data": null } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" }
+        }
+      }
+    },
+    "/campaigns/{id}/spam-report": {
+      "parameters": [ { "$ref": "#/components/parameters/CampaignId" } ],
+      "post": {
+        "tags": ["Results"],
+        "summary": "Trigger the spam-report webhook (Yazamco extension)",
+        "description": "Fires the n8n **spam-report** webhook for this campaign with the full per-recipient result set (including each recipient's rendered `email_subject`, assigned `template_id`, status and reported flag) plus the attributed Company (English + Hebrew names, Hudu customer id).\n\nThe webhook is **fire-and-forget**: a `200` here means the request was queued, not that n8n succeeded. Requires `spam_report_secret` in `config.json`; the payload is sent with the `x-techform-secret` header. Default endpoint: `https://n8n.yazamco.pro/webhook/gophish-check-spam-report-365` (override with `spam_report_url`).",
+        "operationId": "campaignSpamReport",
+        "responses": {
+          "200": {
+            "description": "Webhook queued",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericResponse" }, "example": { "message": "Spam report webhook sent", "success": true, "data": null } } }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "500": {
+            "description": "Webhook not configured (`spam_report_secret` missing) or other failure",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericResponse" } } }
+          }
+        }
+      }
+    },
+    "/groups/": {
+      "get": {
+        "tags": ["Groups"],
+        "summary": "List groups",
+        "description": "Returns all target groups visible to the user, including the full target list of each group. For large groups prefer `/groups/summary`.",
+        "operationId": "getGroups",
+        "responses": {
+          "200": { "description": "A list of groups", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Group" } } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "post": {
+        "tags": ["Groups"],
+        "summary": "Create a group",
+        "description": "Creates a target group. `name` must be unique per user and at least one target is required.",
+        "operationId": "createGroup",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/GroupRequest" },
+              "example": {
+                "name": "Acme Employees",
+                "targets": [
+                  { "email": "dana@acme.co.il", "first_name": "Dana", "last_name": "Levi", "position": "CFO" },
+                  { "email": "yossi@acme.co.il", "first_name": "Yossi", "last_name": "Cohen", "position": "IT" }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Group created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Group" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/groups/summary": {
+      "get": {
+        "tags": ["Groups"],
+        "summary": "Summary of all groups",
+        "description": "Returns each group with its target **count** instead of the full member list.",
+        "operationId": "getGroupsSummary",
+        "responses": {
+          "200": { "description": "Group summaries", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GroupSummaries" } } } },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/groups/{id}": {
+      "parameters": [ { "$ref": "#/components/parameters/ObjectId" } ],
+      "get": {
+        "tags": ["Groups"],
+        "summary": "Get a group",
+        "operationId": "getGroup",
+        "responses": {
+          "200": { "description": "The group", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Group" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "tags": ["Groups"],
+        "summary": "Update a group",
+        "description": "Replaces the group. The body **must** include `id` matching the path parameter, the `name`, and the **complete** target list (targets not present in the body are removed).",
+        "operationId": "updateGroup",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Group" } } }
+        },
+        "responses": {
+          "200": { "description": "Updated group", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Group" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      },
+      "delete": {
+        "tags": ["Groups"],
+        "summary": "Delete a group",
+        "operationId": "deleteGroup",
+        "responses": {
+          "200": { "$ref": "#/components/responses/GenericSuccess" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/groups/{id}/summary": {
+      "parameters": [ { "$ref": "#/components/parameters/ObjectId" } ],
+      "get": {
+        "tags": ["Groups"],
+        "summary": "Get a group summary",
+        "operationId": "getGroupSummary",
+        "responses": {
+          "200": { "description": "The group summary", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GroupSummary" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/companies/": {
+      "get": {
+        "tags": ["Companies"],
+        "summary": "List companies",
+        "description": "Returns the companies (organizations) visible to the user, sorted by name. Campaigns reference a company via `company_id`.",
+        "operationId": "getCompanies",
+        "responses": {
+          "200": { "description": "A list of companies", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Company" } } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "post": {
+        "tags": ["Companies"],
+        "summary": "Create a company",
+        "description": "Creates a company. `name` must be unique per user. `name_he` (Hebrew display name, used in generated reports) and `customer_id` (Hudu customer id) are typically sourced from `/companies/hudu`.",
+        "operationId": "createCompany",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CompanyRequest" },
+              "example": { "name": "Acme Ltd", "name_he": "אקמי בע\"מ", "customer_id": "C-1042" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Company created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Company" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/companies/hudu": {
+      "get": {
+        "tags": ["Companies"],
+        "summary": "List companies known in Hudu (Yazamco extension)",
+        "description": "Proxies the n8n **hudu-companies** webhook server-side (the shared secret never reaches the browser) and returns the **non-archived** companies known in Hudu. Used by the \"New Company\" picker.\n\nRequires `hudu_companies_secret` in `config.json`. Default endpoint: `https://n8n.yazamco.pro/webhook/hudu-companies` (override with `hudu_companies_url`). Note the field mapping: `nickname` = Hebrew name, `id_number` = Hudu customer id.",
+        "operationId": "getHuduCompanies",
+        "responses": {
+          "200": {
+            "description": "Non-archived Hudu companies",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/HuduCompany" } },
+                "example": [ { "id": 17, "name": "Acme Ltd", "nickname": "אקמי בע\"מ", "id_number": "C-1042", "archived": false } ]
+              }
+            }
+          },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "502": {
+            "description": "Hudu webhook unreachable, returned an error, or not configured (`hudu_companies_secret` missing)",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericResponse" } } }
+          }
+        }
+      }
+    },
+    "/companies/{id}": {
+      "parameters": [ { "$ref": "#/components/parameters/ObjectId" } ],
+      "get": {
+        "tags": ["Companies"],
+        "summary": "Get a company",
+        "operationId": "getCompany",
+        "responses": {
+          "200": { "description": "The company", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Company" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "tags": ["Companies"],
+        "summary": "Update a company",
+        "description": "The body must include `id` matching the path parameter.",
+        "operationId": "updateCompany",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Company" } } }
+        },
+        "responses": {
+          "200": { "description": "Updated company", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Company" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      },
+      "delete": {
+        "tags": ["Companies"],
+        "summary": "Delete a company",
+        "description": "Deletes the company. Campaigns previously attributed to it are left unassigned (`company_id` reset to 0), not deleted.",
+        "operationId": "deleteCompany",
+        "responses": {
+          "200": { "$ref": "#/components/responses/GenericSuccess" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/domains/": {
+      "get": {
+        "tags": ["Domains"],
+        "summary": "List domains",
+        "description": "Returns the sending/landing domains visible to the user, sorted by name.",
+        "operationId": "getDomains",
+        "responses": {
+          "200": { "description": "A list of domains", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Domain" } } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "post": {
+        "tags": ["Domains"],
+        "summary": "Create a domain (dispatches n8n provisioning)",
+        "description": "Creates a domain and dispatches a `domain.created` webhook to the configured n8n endpoint (signed with `X-Gophish-Signature`). n8n performs the actual Cloudflare DNS and Microsoft Graph work — Gophish itself provisions nothing.\n\n- `name` must be unique per user.\n- `status` defaults to `pending` when omitted.\n- `configure_365: true` sets `m365_status` to `connected` and adds the Microsoft 365 mail record set (MX, SPF, autodiscover, DKIM selectors, DMARC) to the desired records.\n- `auto_a_record: true` adds a root A record pointing at `ip`.\n- The response includes `records[]` — the desired DNS record set that was sent to n8n (not persisted; shown so the UI can display it).",
+        "operationId": "createDomain",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DomainRequest" },
+              "example": {
+                "name": "acme-portal.com",
+                "ip": "203.0.113.10",
+                "registrar": "Cloudflare",
+                "company_id": 3,
+                "auto_a_record": true,
+                "configure_365": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Domain created; `records` holds the desired DNS record set", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Domain" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/domains/{id}": {
+      "parameters": [ { "$ref": "#/components/parameters/ObjectId" } ],
+      "get": {
+        "tags": ["Domains"],
+        "summary": "Get a domain",
+        "operationId": "getDomain",
+        "responses": {
+          "200": { "description": "The domain", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Domain" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "tags": ["Domains"],
+        "summary": "Update a domain",
+        "description": "The body must include `id` matching the path parameter. Setting `configure_365` recomputes `m365_status` (`connected` / `not_connected`). Updating does **not** re-dispatch the n8n webhook.",
+        "operationId": "updateDomain",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Domain" } } }
+        },
+        "responses": {
+          "200": { "description": "Updated domain", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Domain" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      },
+      "delete": {
+        "tags": ["Domains"],
+        "summary": "Delete a domain",
+        "description": "Deletes the domain record in Gophish only — DNS records already provisioned by n8n are not touched.",
+        "operationId": "deleteDomain",
+        "responses": {
+          "200": { "$ref": "#/components/responses/GenericSuccess" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/templates/": {
+      "get": {
+        "tags": ["Templates"],
+        "summary": "List templates",
+        "operationId": "getTemplates",
+        "responses": {
+          "200": { "description": "A list of templates", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Template" } } } } }
+        }
+      },
+      "post": {
+        "tags": ["Templates"],
+        "summary": "Create a template",
+        "description": "Creates an email template. `name` must be unique per user and at least one of `text` / `html` is required.\n\n**Template variables** available in `subject`, `text` and `html`: `{{.FirstName}}`, `{{.LastName}}`, `{{.Position}}`, `{{.Email}}`, `{{.From}}`, `{{.URL}}` (phishing link incl. `?rid=`), `{{.TrackingURL}}`, `{{.Tracker}}` (`<img>` open tracker), `{{.RId}}`, `{{.BaseURL}}`.\n\nTo import an existing email use `/import/email` first and paste the result here.",
+        "operationId": "createTemplate",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TemplateRequest" },
+              "example": {
+                "name": "Password Reset",
+                "envelope_sender": "it-support@acme-portal.com",
+                "subject": "Action required: password expires today, {{.FirstName}}",
+                "html": "<html><body>Hi {{.FirstName}},<br>Your password expires today. <a href=\"{{.URL}}\">Reset now</a>{{.Tracker}}</body></html>",
+                "text": "Hi {{.FirstName}}, reset your password: {{.URL}}",
+                "attachments": []
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Template created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Template" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/templates/{id}": {
+      "parameters": [ { "$ref": "#/components/parameters/ObjectId" } ],
+      "get": {
+        "tags": ["Templates"],
+        "summary": "Get a template",
+        "operationId": "getTemplate",
+        "responses": {
+          "200": { "description": "The template", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Template" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "tags": ["Templates"],
+        "summary": "Update a template",
+        "description": "The body must include `id` matching the path parameter and the complete template (attachments included — omitted attachments are removed).",
+        "operationId": "updateTemplate",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Template" } } }
+        },
+        "responses": {
+          "200": { "description": "Updated template", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Template" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["Templates"],
+        "summary": "Delete a template",
+        "operationId": "deleteTemplate",
+        "responses": {
+          "200": { "$ref": "#/components/responses/GenericSuccess" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/pages/": {
+      "get": {
+        "tags": ["Landing Pages"],
+        "summary": "List landing pages",
+        "operationId": "getPages",
+        "responses": {
+          "200": { "description": "A list of pages", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Page" } } } } }
+        }
+      },
+      "post": {
+        "tags": ["Landing Pages"],
+        "summary": "Create a landing page",
+        "description": "Creates a landing page. `name` must be unique per user.\n\nOn save, Gophish rewrites the HTML: all `<form>` actions are pointed back at the phishing server, and input `name` attributes are stripped/kept according to `capture_credentials` / `capture_passwords`. **Warning:** with `capture_passwords: true`, submitted passwords are stored in plaintext in the database.\n\n`redirect_url` is where victims are sent after submitting the form (supports template variables). Use `/import/site` to clone an existing site first.",
+        "operationId": "createPage",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PageRequest" },
+              "example": {
+                "name": "O365 Login",
+                "html": "<html><body><form method=\"post\"><input name=\"username\"/><input type=\"password\" name=\"password\"/><button>Sign in</button></form></body></html>",
+                "capture_credentials": true,
+                "capture_passwords": false,
+                "redirect_url": "https://office.com"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Page created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Page" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/pages/{id}": {
+      "parameters": [ { "$ref": "#/components/parameters/ObjectId" } ],
+      "get": {
+        "tags": ["Landing Pages"],
+        "summary": "Get a landing page",
+        "operationId": "getPage",
+        "responses": {
+          "200": { "description": "The page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Page" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "tags": ["Landing Pages"],
+        "summary": "Update a landing page",
+        "description": "The body must include `id` matching the path parameter.",
+        "operationId": "updatePage",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Page" } } }
+        },
+        "responses": {
+          "200": { "description": "Updated page", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Page" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      },
+      "delete": {
+        "tags": ["Landing Pages"],
+        "summary": "Delete a landing page",
+        "operationId": "deletePage",
+        "responses": {
+          "200": { "$ref": "#/components/responses/GenericSuccess" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/smtp/": {
+      "get": {
+        "tags": ["Sending Profiles"],
+        "summary": "List sending profiles",
+        "operationId": "getSendingProfiles",
+        "responses": {
+          "200": { "description": "A list of sending profiles", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/SMTP" } } } } }
+        }
+      },
+      "post": {
+        "tags": ["Sending Profiles"],
+        "summary": "Create a sending profile",
+        "description": "Creates an SMTP sending profile. `name` must be unique per user. `host` is `host:port` (port defaults to 25 when omitted). `from_address` must be a plain email address. Custom `headers` are added to every email sent with this profile (header values support template variables such as `{{.URL}}`).",
+        "operationId": "createSendingProfile",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SMTPRequest" },
+              "example": {
+                "name": "Acme Mailer",
+                "interface_type": "SMTP",
+                "host": "smtp.sendgrid.net:587",
+                "username": "apikey",
+                "password": "SG.xxxxx",
+                "from_address": "it-support@acme-portal.com",
+                "ignore_cert_errors": false,
+                "headers": [ { "key": "X-Mailer", "value": "Outlook" } ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Profile created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SMTP" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/smtp/{id}": {
+      "parameters": [ { "$ref": "#/components/parameters/ObjectId" } ],
+      "get": {
+        "tags": ["Sending Profiles"],
+        "summary": "Get a sending profile",
+        "operationId": "getSendingProfile",
+        "responses": {
+          "200": { "description": "The profile", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SMTP" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "tags": ["Sending Profiles"],
+        "summary": "Update a sending profile",
+        "description": "The body must include `id` matching the path parameter and pass SMTP validation.",
+        "operationId": "updateSendingProfile",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SMTP" } } }
+        },
+        "responses": {
+          "200": { "description": "Updated profile", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SMTP" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      },
+      "delete": {
+        "tags": ["Sending Profiles"],
+        "summary": "Delete a sending profile",
+        "operationId": "deleteSendingProfile",
+        "responses": {
+          "200": { "$ref": "#/components/responses/GenericSuccess" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/users/": {
+      "get": {
+        "tags": ["Users"],
+        "summary": "List users (admin only)",
+        "description": "Requires the `modify_system` permission (admin role).",
+        "operationId": "getUsers",
+        "responses": {
+          "200": { "description": "A list of users", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/User" } } } } },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      },
+      "post": {
+        "tags": ["Users"],
+        "summary": "Create a user (admin only)",
+        "description": "Creates a user account. The password must satisfy the password policy (minimum 8 characters). A fresh API key is generated automatically. Roles: `admin` (full access) or `user`.",
+        "operationId": "createUser",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UserRequest" },
+              "example": { "username": "analyst1", "password": "S3cure-Passw0rd!", "role": "user", "password_change_required": true, "account_locked": false }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "User created (includes the generated `api_key`)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/users/{id}": {
+      "parameters": [ { "$ref": "#/components/parameters/ObjectId" } ],
+      "get": {
+        "tags": ["Users"],
+        "summary": "Get a user",
+        "description": "Admins may fetch any user; other users may only fetch their own account.",
+        "operationId": "getUser",
+        "responses": {
+          "200": { "description": "The user", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } } },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "tags": ["Users"],
+        "summary": "Update a user",
+        "description": "Admins may modify any user; other users only themselves and may **not** change their own role. Password is optional — when provided it must satisfy the password policy. The last remaining admin cannot be demoted.",
+        "operationId": "updateUser",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Updated user", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      },
+      "delete": {
+        "tags": ["Users"],
+        "summary": "Delete a user",
+        "description": "Admins may delete any user; other users may only delete their own account.",
+        "operationId": "deleteUser",
+        "responses": {
+          "200": { "$ref": "#/components/responses/GenericSuccess" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/webhooks/": {
+      "get": {
+        "tags": ["Webhooks"],
+        "summary": "List webhooks (admin only)",
+        "description": "Returns all outbound webhooks, active and disabled. Active webhooks receive a signed JSON POST (`X-Gophish-Signature: sha256=<hmac>`) for every campaign event (sent / opened / clicked / submitted / reported).",
+        "operationId": "getWebhooks",
+        "responses": {
+          "200": { "description": "A list of webhooks", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Webhook" } } } } },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      },
+      "post": {
+        "tags": ["Webhooks"],
+        "summary": "Create a webhook (admin only)",
+        "operationId": "createWebhook",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/WebhookRequest" },
+              "example": { "name": "SIEM forwarder", "url": "https://siem.example.com/gophish", "secret": "shared-hmac-secret", "is_active": true }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Webhook created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Webhook" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/webhooks/{id}": {
+      "parameters": [ { "$ref": "#/components/parameters/ObjectId" } ],
+      "get": {
+        "tags": ["Webhooks"],
+        "summary": "Get a webhook (admin only)",
+        "operationId": "getWebhook",
+        "responses": {
+          "200": { "description": "The webhook", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Webhook" } } } },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "tags": ["Webhooks"],
+        "summary": "Update a webhook (admin only)",
+        "description": "The `id` is taken from the path; any `id` in the body is ignored.",
+        "operationId": "updateWebhook",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WebhookRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Updated webhook", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Webhook" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["Webhooks"],
+        "summary": "Delete a webhook (admin only)",
+        "operationId": "deleteWebhook",
+        "responses": {
+          "200": { "$ref": "#/components/responses/GenericSuccess" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/webhooks/{id}/validate": {
+      "parameters": [ { "$ref": "#/components/parameters/ObjectId" } ],
+      "post": {
+        "tags": ["Webhooks"],
+        "summary": "Send a test ping to a webhook (admin only)",
+        "description": "POSTs `{\"success\": true}` (signed) to the webhook's URL to verify it is reachable. Returns the webhook on success.",
+        "operationId": "validateWebhook",
+        "responses": {
+          "200": { "description": "Ping delivered", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Webhook" } } } },
+          "400": { "description": "The remote endpoint rejected the ping or was unreachable", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericResponse" } } } },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/imap/": {
+      "get": {
+        "tags": ["IMAP"],
+        "summary": "Get IMAP settings",
+        "description": "Returns the user's IMAP configuration as a list (empty list when not configured). The IMAP account is polled for user-reported phishing emails; matching campaign emails are marked **Email Reported**.",
+        "operationId": "getIMAP",
+        "responses": {
+          "200": { "description": "IMAP settings (0 or 1 entries)", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/IMAP" } } } } },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      },
+      "post": {
+        "tags": ["IMAP"],
+        "summary": "Save IMAP settings",
+        "description": "Creates or replaces the user's IMAP configuration. Note: `port` and `imap_freq` are JSON **strings** (e.g. `\"993\"`).",
+        "operationId": "saveIMAP",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/IMAP" },
+              "example": {
+                "enabled": true,
+                "host": "outlook.office365.com",
+                "port": "993",
+                "username": "reports@acme.co.il",
+                "password": "app-password",
+                "tls": true,
+                "ignore_cert_errors": false,
+                "folder": "INBOX",
+                "imap_freq": "60",
+                "restrict_domain": "",
+                "delete_reported_campaign_email": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Settings saved", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericResponse" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/imap/validate": {
+      "post": {
+        "tags": ["IMAP"],
+        "summary": "Test an IMAP login",
+        "description": "Attempts to log in with the supplied IMAP settings without saving them. **Note:** a failed login still returns HTTP 200 with `success: false` and the error message; a successful login returns HTTP 201.",
+        "operationId": "validateIMAP",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IMAP" } } }
+        },
+        "responses": {
+          "200": { "description": "Login failed — see `message`", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericResponse" } } } },
+          "201": { "description": "Login succeeded", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericResponse" }, "example": { "message": "Successful login.", "success": true, "data": null } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/import/group": {
+      "post": {
+        "tags": ["Import"],
+        "summary": "Parse a CSV of targets",
+        "description": "Parses an uploaded CSV file and returns the targets it contains — it does **not** create a group; pass the result to `POST /groups/`.\n\nExpected headers (case-insensitive, order-free): `First Name`, `Last Name`, `Email`, `Position`.",
+        "operationId": "importGroup",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "files[]": { "type": "string", "format": "binary", "description": "The CSV file" }
+                },
+                "required": ["files[]"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Parsed targets", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Target" } } } } },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/import/email": {
+      "post": {
+        "tags": ["Import"],
+        "summary": "Parse a raw email (.eml) into template content",
+        "description": "Parses a raw RFC 2045 email (full headers + body) and returns its subject, text and HTML parts, ready to be saved as a template. With `convert_links: true`, every `<a href>` in the HTML is rewritten to `{{.URL}}`.",
+        "operationId": "importEmail",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "content": { "type": "string", "description": "The full raw email source (headers + body)" },
+                  "convert_links": { "type": "boolean", "description": "Rewrite all links in the HTML to `{{.URL}}`" }
+                },
+                "required": ["content"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Parsed email",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "text": { "type": "string", "description": "Plaintext body" },
+                    "html": { "type": "string", "description": "HTML body (links rewritten if requested)" },
+                    "subject": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/import/site": {
+      "post": {
+        "tags": ["Import"],
+        "summary": "Clone a website's HTML",
+        "description": "Fetches the given URL server-side and returns its HTML, prepared for use as a landing page:\n- a `<base href>` tag is injected so relative resources keep loading from the original site\n- every `<form>` gets a hidden `__original_url` input recording where it came from\n\nTLS certificate errors on the target site are ignored. (`include_resources` is accepted but currently has no effect.)",
+        "operationId": "importSite",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": { "type": "string", "description": "The URL to clone", "example": "https://login.microsoftonline.com" },
+                  "include_resources": { "type": "boolean", "description": "Reserved; currently unused" }
+                },
+                "required": ["url"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cloned HTML",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "html": { "type": "string" } } } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/util/send_test_email": {
+      "post": {
+        "tags": ["Utilities"],
+        "summary": "Send a test email",
+        "description": "Sends a single test email to the given recipient.\n\n- `template.name` — optional; when omitted a built-in \"It works!\" message is sent. When set, the template is looked up by name.\n- `smtp` — either reference an existing profile by `name`, or inline a **complete** sending profile (host + from_address etc.).\n- `page.name` — optional landing page reference, used so `{{.URL}}` resolves.\n- `url` — base phishing URL used to render `{{.URL}}` / `{{.TrackingURL}}` in the test.\n\nThe call **blocks** until the SMTP transaction finishes, so failures (bad credentials, connection refused) are reported synchronously.",
+        "operationId": "sendTestEmail",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SendTestEmailRequest" },
+              "example": {
+                "template": { "name": "Password Reset" },
+                "page": { "name": "O365 Login" },
+                "smtp": { "name": "Acme Mailer" },
+                "url": "https://login.acme-portal.com",
+                "first_name": "Dana",
+                "last_name": "Levi",
+                "email": "dana@acme.co.il",
+                "position": "CFO"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Email sent", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericResponse" }, "example": { "message": "Email Sent", "success": true, "data": null } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/reset": {
+      "post": {
+        "tags": ["Utilities"],
+        "summary": "Reset your API key",
+        "description": "Generates a fresh API key for the authenticated user and **invalidates the current one immediately**. The new key is returned in `data`.",
+        "operationId": "resetAPIKey",
+        "responses": {
+          "200": {
+            "description": "Key reset",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GenericResponse" },
+                "example": { "message": "API Key successfully reset!", "success": true, "data": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" }
+              }
+            }
+          },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Your personal API key from Account Settings, sent as `Authorization: Bearer <API_KEY>`."
+      },
+      "ApiKeyQuery": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "api_key",
+        "description": "Your personal API key as a query parameter, e.g. `?api_key=<API_KEY>`."
+      }
+    },
+    "parameters": {
+      "ObjectId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "The numeric object ID",
+        "schema": { "type": "integer", "format": "int64", "minimum": 1 }
+      },
+      "CampaignId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "The numeric campaign ID",
+        "schema": { "type": "integer", "format": "int64", "minimum": 1 }
+      }
+    },
+    "responses": {
+      "GenericSuccess": {
+        "description": "Operation succeeded",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericResponse" } } }
+      },
+      "BadRequest": {
+        "description": "Validation failed or malformed JSON — see `message`",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericResponse" } } }
+      },
+      "Unauthorized": {
+        "description": "Missing or invalid API key",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericResponse" }, "example": { "message": "API Key not set", "success": false, "data": null } } }
+      },
+      "Forbidden": {
+        "description": "Insufficient permissions (admin / `modify_system` required, or view-only account attempting a write)",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericResponse" } } }
+      },
+      "NotFound": {
+        "description": "Object not found (or not owned by you)",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericResponse" } } }
+      },
+      "Conflict": {
+        "description": "Name already in use",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericResponse" } } }
+      },
+      "MethodNotAllowed": {
+        "description": "Wrong HTTP method for this endpoint",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericResponse" } } }
+      },
+      "ServerError": {
+        "description": "Internal server error",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericResponse" } } }
+      }
+    },
+    "schemas": {
+      "GenericResponse": {
+        "type": "object",
+        "description": "Standard response envelope for status messages and errors.",
+        "properties": {
+          "message": { "type": "string", "example": "Campaign deleted successfully!" },
+          "success": { "type": "boolean" },
+          "data": { "nullable": true, "description": "Optional payload (e.g. the new API key on `/reset`)" }
+        }
+      },
+      "Campaign": {
+        "type": "object",
+        "description": "A phishing campaign with its full configuration, per-recipient results and event timeline.",
+        "properties": {
+          "id": { "type": "integer", "format": "int64", "readOnly": true },
+          "name": { "type": "string", "example": "Q3 Awareness - Acme" },
+          "created_date": { "type": "string", "format": "date-time", "readOnly": true },
+          "launch_date": { "type": "string", "format": "date-time", "description": "When sending starts. Omit / past value = launch immediately." },
+          "send_by_date": { "type": "string", "format": "date-time", "description": "Optional deadline; sending is spread evenly between launch_date and this time. Zero date = send as fast as possible." },
+          "completed_date": { "type": "string", "format": "date-time", "readOnly": true },
+          "template": { "$ref": "#/components/schemas/Template" },
+          "templates": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Template" },
+            "description": "**Yazamco extension** — optional template rotation pool. When more than one template is given, each recipient is randomly assigned one at launch; `template` holds the first pool entry for compatibility."
+          },
+          "page": { "$ref": "#/components/schemas/Page" },
+          "status": { "$ref": "#/components/schemas/CampaignStatus" },
+          "results": { "type": "array", "items": { "$ref": "#/components/schemas/Result" }, "readOnly": true },
+          "groups": { "type": "array", "items": { "$ref": "#/components/schemas/Group" } },
+          "timeline": { "type": "array", "items": { "$ref": "#/components/schemas/Event" }, "readOnly": true },
+          "smtp": { "$ref": "#/components/schemas/SMTP" },
+          "url": { "type": "string", "description": "Base URL of the phishing server; `{{.URL}}` in templates resolves to this plus `?rid=<result id>`", "example": "https://login.acme-portal.com" },
+          "company_id": { "type": "integer", "format": "int64", "description": "ID of the Company this campaign is attributed to (0 = unassigned)" }
+        }
+      },
+      "CampaignRequest": {
+        "type": "object",
+        "description": "Payload for creating a campaign. Referenced objects are matched **by name** and must already exist.",
+        "required": ["name", "page", "groups", "smtp"],
+        "properties": {
+          "name": { "type": "string" },
+          "template": { "type": "object", "properties": { "name": { "type": "string" } }, "description": "Email template reference (by name). Optional when `templates` is provided." },
+          "templates": {
+            "type": "array",
+            "items": { "type": "object", "properties": { "name": { "type": "string" } } },
+            "description": "**Yazamco extension** — rotation pool of template references. Each recipient gets a random one."
+          },
+          "page": { "type": "object", "required": ["name"], "properties": { "name": { "type": "string" } }, "description": "Landing page reference (by name)" },
+          "groups": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "object", "required": ["name"], "properties": { "name": { "type": "string" } } },
+            "description": "Target group references (by name)"
+          },
+          "smtp": { "type": "object", "required": ["name"], "properties": { "name": { "type": "string" } }, "description": "Sending profile reference (by name)" },
+          "url": { "type": "string", "description": "Phishing server base URL used in `{{.URL}}`" },
+          "launch_date": { "type": "string", "format": "date-time", "description": "Omit to launch immediately" },
+          "send_by_date": { "type": "string", "format": "date-time", "description": "Must be after launch_date when set" },
+          "company_id": { "type": "integer", "format": "int64", "description": "Optional Company attribution" }
+        }
+      },
+      "CampaignStatus": {
+        "type": "string",
+        "description": "Campaign lifecycle status.",
+        "enum": ["Created", "Queued", "In progress", "Emails Sent", "Completed"]
+      },
+      "CampaignResults": {
+        "type": "object",
+        "description": "Slim view of a campaign: results + timeline only.",
+        "properties": {
+          "id": { "type": "integer", "format": "int64" },
+          "name": { "type": "string" },
+          "status": { "$ref": "#/components/schemas/CampaignStatus" },
+          "results": { "type": "array", "items": { "$ref": "#/components/schemas/Result" } },
+          "timeline": { "type": "array", "items": { "$ref": "#/components/schemas/Event" } }
+        }
+      },
+      "CampaignSummaries": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "integer", "format": "int64" },
+          "campaigns": { "type": "array", "items": { "$ref": "#/components/schemas/CampaignSummary" } }
+        }
+      },
+      "CampaignSummary": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "format": "int64" },
+          "created_date": { "type": "string", "format": "date-time" },
+          "launch_date": { "type": "string", "format": "date-time" },
+          "send_by_date": { "type": "string", "format": "date-time" },
+          "completed_date": { "type": "string", "format": "date-time" },
+          "status": { "$ref": "#/components/schemas/CampaignStatus" },
+          "name": { "type": "string" },
+          "company_id": { "type": "integer", "format": "int64", "description": "Attributed Company id (0 = unassigned)" },
+          "company": { "type": "string", "description": "Attributed Company name" },
+          "stats": { "$ref": "#/components/schemas/CampaignStats" }
+        }
+      },
+      "CampaignStats": {
+        "type": "object",
+        "description": "Aggregate counters. Each counter is the number of recipients who reached at least that stage (a recipient who submitted data also counts in `clicked`, `opened` and `sent`).",
+        "properties": {
+          "total": { "type": "integer", "format": "int64", "description": "Total recipients" },
+          "sent": { "type": "integer", "format": "int64" },
+          "opened": { "type": "integer", "format": "int64" },
+          "clicked": { "type": "integer", "format": "int64" },
+          "submitted_data": { "type": "integer", "format": "int64" },
+          "email_reported": { "type": "integer", "format": "int64" },
+          "error": { "type": "integer", "format": "int64" }
+        }
+      },
+      "Result": {
+        "type": "object",
+        "description": "A single recipient in a campaign and their current state.",
+        "properties": {
+          "id": { "type": "string", "description": "The recipient's unique result id (`rid`) — appears as `?rid=` in phishing URLs and is used by the resend endpoints", "example": "b7c9d2e" },
+          "status": { "$ref": "#/components/schemas/ResultStatus" },
+          "ip": { "type": "string", "description": "Last seen IP (from opens/clicks)", "example": "84.94.10.5" },
+          "latitude": { "type": "number", "format": "double" },
+          "longitude": { "type": "number", "format": "double" },
+          "send_date": { "type": "string", "format": "date-time", "description": "When the email was sent (or is scheduled)" },
+          "reported": { "type": "boolean", "description": "Whether the recipient reported the email (via IMAP detection or the report endpoint)" },
+          "modified_date": { "type": "string", "format": "date-time" },
+          "template_id": { "type": "integer", "format": "int64", "description": "**Yazamco extension** — the template assigned to this recipient from the rotation pool (0 = campaign's single template)" },
+          "email_subject": { "type": "string", "description": "**Yazamco extension** — the rendered subject line this recipient actually received (per-recipient, since subjects can contain template variables and campaigns can rotate templates)", "example": "Action required: password expires today, Dana" },
+          "email": { "type": "string", "format": "email" },
+          "first_name": { "type": "string" },
+          "last_name": { "type": "string" },
+          "position": { "type": "string" }
+        }
+      },
+      "ResultStatus": {
+        "type": "string",
+        "description": "The recipient's furthest stage in the campaign.",
+        "enum": ["Scheduled", "Sending", "Retrying", "Email Sent", "Email Opened", "Clicked Link", "Submitted Data", "Email Reported", "Error"]
+      },
+      "Event": {
+        "type": "object",
+        "description": "A timeline event for a campaign.",
+        "properties": {
+          "campaign_id": { "type": "integer", "format": "int64" },
+          "email": { "type": "string", "description": "Recipient email (empty for campaign-level events like 'Campaign Created')" },
+          "time": { "type": "string", "format": "date-time" },
+          "message": {
+            "type": "string",
+            "description": "Event type",
+            "enum": ["Campaign Created", "Email Sent", "Error Sending Email", "Email Opened", "Clicked Link", "Submitted Data", "Email Reported", "Proxied request"]
+          },
+          "details": { "type": "string", "description": "JSON string with extra context: for clicks/submissions `{\"payload\": {...form fields...}, \"browser\": {\"address\": ip, \"user-agent\": ua}}`; for send errors `{\"error\": \"...\"}`" }
+        }
+      },
+      "ResendRequest": {
+        "type": "object",
+        "required": ["ids"],
+        "properties": {
+          "ids": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string" },
+            "description": "Result ids (`Result.id` strings) of the recipients to resend to"
+          }
+        }
+      },
+      "Group": {
+        "type": "object",
+        "description": "A group of phishing targets.",
+        "properties": {
+          "id": { "type": "integer", "format": "int64", "readOnly": true },
+          "name": { "type": "string", "example": "Acme Employees" },
+          "modified_date": { "type": "string", "format": "date-time", "readOnly": true },
+          "targets": { "type": "array", "items": { "$ref": "#/components/schemas/Target" } }
+        }
+      },
+      "GroupRequest": {
+        "type": "object",
+        "required": ["name", "targets"],
+        "properties": {
+          "name": { "type": "string" },
+          "targets": { "type": "array", "minItems": 1, "items": { "$ref": "#/components/schemas/Target" } }
+        }
+      },
+      "GroupSummaries": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "integer", "format": "int64" },
+          "groups": { "type": "array", "items": { "$ref": "#/components/schemas/GroupSummary" } }
+        }
+      },
+      "GroupSummary": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "format": "int64" },
+          "name": { "type": "string" },
+          "modified_date": { "type": "string", "format": "date-time" },
+          "num_targets": { "type": "integer", "format": "int64" }
+        }
+      },
+      "Target": {
+        "type": "object",
+        "required": ["email"],
+        "properties": {
+          "email": { "type": "string", "format": "email", "example": "dana@acme.co.il" },
+          "first_name": { "type": "string", "example": "Dana" },
+          "last_name": { "type": "string", "example": "Levi" },
+          "position": { "type": "string", "example": "CFO" }
+        }
+      },
+      "Company": {
+        "type": "object",
+        "description": "An organization campaigns can be attributed to. `name_he` and `customer_id` are sourced from Hudu via `/companies/hudu`.",
+        "properties": {
+          "id": { "type": "integer", "format": "int64", "readOnly": true },
+          "name": { "type": "string", "description": "English company name", "example": "Acme Ltd" },
+          "name_he": { "type": "string", "description": "Hebrew display name (used in generated reports)", "example": "אקמי בע\"מ" },
+          "customer_id": { "type": "string", "description": "Hudu customer id", "example": "C-1042" },
+          "modified_date": { "type": "string", "format": "date-time", "readOnly": true }
+        }
+      },
+      "CompanyRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "name_he": { "type": "string" },
+          "customer_id": { "type": "string" }
+        }
+      },
+      "HuduCompany": {
+        "type": "object",
+        "description": "A company as returned by the n8n hudu-companies webhook. Note the field names differ from `Company`: `nickname` is the Hebrew name and `id_number` is the customer id.",
+        "properties": {
+          "id": { "type": "integer", "format": "int64", "description": "Hudu company id (not a Gophish id)" },
+          "name": { "type": "string" },
+          "nickname": { "type": "string", "description": "Hebrew display name" },
+          "id_number": { "type": "string", "description": "Hudu customer id" },
+          "archived": { "type": "boolean", "description": "Always `false` in responses — archived companies are filtered out" }
+        }
+      },
+      "Domain": {
+        "type": "object",
+        "description": "A sending/landing domain managed through the Domains page. DNS / M365 provisioning is performed by n8n, not by Gophish.",
+        "properties": {
+          "id": { "type": "integer", "format": "int64", "readOnly": true },
+          "company_id": { "type": "integer", "format": "int64", "description": "Owning Company (0 = unassigned). Used by the campaign wizard to auto-fill the listener URL and pick a matching sending profile." },
+          "name": { "type": "string", "example": "acme-portal.com" },
+          "ip": { "type": "string", "description": "IP for the root A record", "example": "203.0.113.10" },
+          "registrar": { "type": "string", "example": "Cloudflare" },
+          "auto_a_record": { "type": "boolean", "description": "Provision a root A record pointing at `ip`" },
+          "configure_365": { "type": "boolean", "description": "Provision the Microsoft 365 mail record set (MX, SPF, autodiscover, DKIM, DMARC)" },
+          "status": { "type": "string", "enum": ["pending", "verified", "failed"], "description": "Provisioning status (defaults to `pending` on create)" },
+          "m365_status": { "type": "string", "enum": ["not_connected", "connected"], "readOnly": true, "description": "Derived from `configure_365`" },
+          "modified_date": { "type": "string", "format": "date-time", "readOnly": true },
+          "records": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/DNSRecord" },
+            "readOnly": true,
+            "description": "Desired DNS record set — only populated in the `POST /domains/` response (not persisted)"
+          }
+        }
+      },
+      "DomainRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "ip": { "type": "string" },
+          "registrar": { "type": "string" },
+          "company_id": { "type": "integer", "format": "int64" },
+          "auto_a_record": { "type": "boolean" },
+          "configure_365": { "type": "boolean" },
+          "status": { "type": "string", "enum": ["pending", "verified", "failed"], "description": "Defaults to `pending`" }
+        }
+      },
+      "DNSRecord": {
+        "type": "object",
+        "description": "A single record in a domain's desired DNS record set (also part of the n8n webhook payload).",
+        "properties": {
+          "type": { "type": "string", "example": "MX" },
+          "host": { "type": "string", "example": "@" },
+          "value": { "type": "string", "example": "acme-portal-com.mail.protection.outlook.com" },
+          "ttl": { "type": "string", "example": "3600" },
+          "priority": { "type": "integer", "description": "MX priority (omitted for other record types)" },
+          "label": { "type": "string", "example": "Mail routing" }
+        }
+      },
+      "Template": {
+        "type": "object",
+        "description": "An email template. Subject, text and HTML support Go template variables (see `POST /templates/`).",
+        "properties": {
+          "id": { "type": "integer", "format": "int64", "readOnly": true },
+          "name": { "type": "string", "example": "Password Reset" },
+          "envelope_sender": { "type": "string", "description": "Optional SMTP MAIL FROM override; defaults to the sending profile's from_address", "example": "it-support@acme-portal.com" },
+          "subject": { "type": "string", "example": "Action required: password expires today, {{.FirstName}}" },
+          "text": { "type": "string", "description": "Plaintext body" },
+          "html": { "type": "string", "description": "HTML body" },
+          "modified_date": { "type": "string", "format": "date-time", "readOnly": true },
+          "attachments": { "type": "array", "items": { "$ref": "#/components/schemas/Attachment" } }
+        }
+      },
+      "TemplateRequest": {
+        "type": "object",
+        "required": ["name"],
+        "description": "At least one of `text` / `html` is required.",
+        "properties": {
+          "name": { "type": "string" },
+          "envelope_sender": { "type": "string" },
+          "subject": { "type": "string" },
+          "text": { "type": "string" },
+          "html": { "type": "string" },
+          "attachments": { "type": "array", "items": { "$ref": "#/components/schemas/Attachment" } }
+        }
+      },
+      "Attachment": {
+        "type": "object",
+        "required": ["content", "type", "name"],
+        "description": "An email attachment. Text-based attachment types also support template variables.",
+        "properties": {
+          "content": { "type": "string", "format": "byte", "description": "Base64-encoded file content" },
+          "type": { "type": "string", "description": "MIME type", "example": "application/pdf" },
+          "name": { "type": "string", "description": "Filename shown to the recipient", "example": "invoice.pdf" }
+        }
+      },
+      "Page": {
+        "type": "object",
+        "description": "A phishing landing page.",
+        "properties": {
+          "id": { "type": "integer", "format": "int64", "readOnly": true },
+          "name": { "type": "string", "example": "O365 Login" },
+          "html": { "type": "string", "description": "Page HTML. Forms are rewritten on save to post back to the phishing server." },
+          "capture_credentials": { "type": "boolean", "description": "Record submitted form fields (passwords excluded unless capture_passwords)" },
+          "capture_passwords": { "type": "boolean", "description": "Also record password fields — stored in **plaintext**" },
+          "redirect_url": { "type": "string", "description": "Where the victim is redirected after submitting", "example": "https://office.com" },
+          "modified_date": { "type": "string", "format": "date-time", "readOnly": true }
+        }
+      },
+      "PageRequest": {
+        "type": "object",
+        "required": ["name", "html"],
+        "properties": {
+          "name": { "type": "string" },
+          "html": { "type": "string" },
+          "capture_credentials": { "type": "boolean" },
+          "capture_passwords": { "type": "boolean" },
+          "redirect_url": { "type": "string" }
+        }
+      },
+      "SMTP": {
+        "type": "object",
+        "description": "An SMTP sending profile.",
+        "properties": {
+          "id": { "type": "integer", "format": "int64", "readOnly": true },
+          "interface_type": { "type": "string", "description": "Always `SMTP`", "example": "SMTP" },
+          "name": { "type": "string", "example": "Acme Mailer" },
+          "host": { "type": "string", "description": "`host:port` (port defaults to 25)", "example": "smtp.sendgrid.net:587" },
+          "username": { "type": "string", "description": "SMTP auth username (omit for unauthenticated relays)" },
+          "password": { "type": "string", "description": "SMTP auth password" },
+          "from_address": { "type": "string", "description": "Plain email address used as the From / envelope sender", "example": "it-support@acme-portal.com" },
+          "ignore_cert_errors": { "type": "boolean", "description": "Skip TLS certificate verification on the SMTP connection" },
+          "headers": { "type": "array", "items": { "$ref": "#/components/schemas/Header" }, "description": "Custom headers added to every email (values support template variables)" },
+          "modified_date": { "type": "string", "format": "date-time", "readOnly": true }
+        }
+      },
+      "SMTPRequest": {
+        "type": "object",
+        "required": ["name", "host", "from_address"],
+        "properties": {
+          "name": { "type": "string" },
+          "interface_type": { "type": "string", "default": "SMTP" },
+          "host": { "type": "string" },
+          "username": { "type": "string" },
+          "password": { "type": "string" },
+          "from_address": { "type": "string" },
+          "ignore_cert_errors": { "type": "boolean" },
+          "headers": { "type": "array", "items": { "$ref": "#/components/schemas/Header" } }
+        }
+      },
+      "Header": {
+        "type": "object",
+        "required": ["key", "value"],
+        "properties": {
+          "key": { "type": "string", "example": "X-Mailer" },
+          "value": { "type": "string", "example": "Outlook" }
+        }
+      },
+      "User": {
+        "type": "object",
+        "description": "A Gophish user account. Password hashes are never returned.",
+        "properties": {
+          "id": { "type": "integer", "format": "int64", "readOnly": true },
+          "username": { "type": "string", "example": "analyst1" },
+          "api_key": { "type": "string", "readOnly": true, "description": "The user's API key" },
+          "role": { "$ref": "#/components/schemas/Role" },
+          "password_change_required": { "type": "boolean", "description": "Force a password change at next login" },
+          "account_locked": { "type": "boolean", "description": "Locked accounts cannot log in; existing sessions are invalidated" },
+          "last_login": { "type": "string", "format": "date-time", "readOnly": true }
+        }
+      },
+      "UserRequest": {
+        "type": "object",
+        "required": ["username", "role"],
+        "description": "Payload for creating/updating a user. On update, omit `password` to keep the current one.",
+        "properties": {
+          "username": { "type": "string" },
+          "password": { "type": "string", "format": "password", "description": "Must satisfy the password policy (min 8 chars). Required on create." },
+          "role": { "type": "string", "enum": ["admin", "user"], "description": "Role slug" },
+          "password_change_required": { "type": "boolean" },
+          "account_locked": { "type": "boolean" }
+        }
+      },
+      "Role": {
+        "type": "object",
+        "readOnly": true,
+        "properties": {
+          "slug": { "type": "string", "enum": ["admin", "user"] },
+          "name": { "type": "string", "example": "Admin" },
+          "description": { "type": "string", "example": "System administrator with full permissions" }
+        }
+      },
+      "Webhook": {
+        "type": "object",
+        "description": "An outbound event webhook. Active webhooks receive a JSON POST for every campaign event, signed with `X-Gophish-Signature: sha256=<HMAC-SHA256 of body using secret>`.",
+        "properties": {
+          "id": { "type": "integer", "format": "int64", "readOnly": true },
+          "name": { "type": "string", "example": "SIEM forwarder" },
+          "url": { "type": "string", "example": "https://siem.example.com/gophish" },
+          "secret": { "type": "string", "description": "HMAC signing secret" },
+          "is_active": { "type": "boolean" }
+        }
+      },
+      "WebhookRequest": {
+        "type": "object",
+        "required": ["name", "url"],
+        "properties": {
+          "name": { "type": "string" },
+          "url": { "type": "string" },
+          "secret": { "type": "string" },
+          "is_active": { "type": "boolean" }
+        }
+      },
+      "IMAP": {
+        "type": "object",
+        "description": "IMAP account polled for user-reported phishing emails. **Note:** `port` and `imap_freq` are JSON strings.",
+        "required": ["host", "port", "username", "password"],
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "host": { "type": "string", "example": "outlook.office365.com" },
+          "port": { "type": "string", "description": "IMAP port as a string", "example": "993" },
+          "username": { "type": "string" },
+          "password": { "type": "string", "format": "password" },
+          "tls": { "type": "boolean" },
+          "ignore_cert_errors": { "type": "boolean" },
+          "folder": { "type": "string", "default": "INBOX" },
+          "restrict_domain": { "type": "string", "description": "Only process reports from this domain (empty = no restriction)" },
+          "delete_reported_campaign_email": { "type": "boolean", "description": "Delete matched campaign emails from the mailbox after processing" },
+          "last_login": { "type": "string", "format": "date-time", "readOnly": true, "description": "Last successful poll" },
+          "modified_date": { "type": "string", "format": "date-time", "readOnly": true },
+          "imap_freq": { "type": "string", "description": "Polling interval in seconds, as a string", "default": "60", "example": "60" }
+        }
+      },
+      "SendTestEmailRequest": {
+        "type": "object",
+        "required": ["email", "smtp"],
+        "properties": {
+          "template": { "type": "object", "properties": { "name": { "type": "string" } }, "description": "Template reference by name; omit for the built-in test message" },
+          "page": { "type": "object", "properties": { "name": { "type": "string" } }, "description": "Landing page reference by name (optional)" },
+          "smtp": {
+            "description": "Either `{\"name\": \"...\"}` referencing an existing profile, or a complete inline sending profile",
+            "oneOf": [
+              { "type": "object", "required": ["name"], "properties": { "name": { "type": "string" } } },
+              { "$ref": "#/components/schemas/SMTPRequest" }
+            ]
+          },
+          "url": { "type": "string", "description": "Base URL used to render `{{.URL}}` in the test email" },
+          "email": { "type": "string", "format": "email", "description": "Recipient of the test email" },
+          "first_name": { "type": "string" },
+          "last_name": { "type": "string" },
+          "position": { "type": "string" }
+        }
+      }
+    }
+  }
+}
