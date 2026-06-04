@@ -240,6 +240,42 @@
         }
       }
     },
+    "/campaigns/{id}/results/{rid}/report": {
+      "parameters": [
+        { "$ref": "#/components/parameters/CampaignId" },
+        {
+          "name": "rid",
+          "in": "path",
+          "required": true,
+          "description": "The recipient's result ID (`Result.id`, e.g. `b7c9d2e`) — **not** a numeric row id.",
+          "schema": { "type": "string" }
+        }
+      ],
+      "post": {
+        "tags": ["Results"],
+        "summary": "Mark a recipient as reported (Yazamco extension)",
+        "description": "Manually flags a single recipient as having reported the phishing email. Sets the recipient's `reported` flag to `true` and adds an **Email Reported** event to the campaign timeline.\n\nThis is the authenticated, admin-facing counterpart to the automatic IMAP / report-button mechanism — use it to record a recipient who reported the email out-of-band (e.g. by phone or by forwarding it to the SOC).\n\nThe call is **idempotent**: if the recipient is already marked as reported, it returns `200` without adding a duplicate timeline event. The result must belong to the campaign.",
+        "operationId": "markResultReported",
+        "responses": {
+          "200": {
+            "description": "Recipient marked as reported (or already was)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GenericResponse" },
+                "examples": {
+                  "marked": { "summary": "Newly marked", "value": { "message": "Recipient marked as reported", "success": true, "data": null } },
+                  "already": { "summary": "Already reported", "value": { "message": "Recipient already marked as reported", "success": true, "data": null } }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "405": { "$ref": "#/components/responses/MethodNotAllowed" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
     "/campaigns/{id}/spam-report": {
       "parameters": [ { "$ref": "#/components/parameters/CampaignId" } ],
       "post": {

@@ -160,6 +160,49 @@ func (as *Server) CampaignSpamReport(w http.ResponseWriter, r *http.Request) {
 	JSONResponse(w, models.Response{Success: true, Message: "Spam report webhook sent"}, http.StatusOK)
 }
 
+// ResultReported marks a single recipient in a campaign as having reported the
+// phishing email, setting the Reported flag and adding an "Email Reported" event
+// to the campaign timeline. This is the authenticated, admin-facing counterpart
+// to the public phishing-server report handler: it lets the SOC manually flag a
+// recipient who reported out-of-band (e.g. by phone or forwarded email) rather
+// than through the automated IMAP/report mechanism.
+// It accepts POST /campaigns/{id}/results/{rid}/report.
+func (as *Server) ResultReported(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		JSONResponse(w, models.Response{Success: false, Message: "Method not allowed"}, http.StatusMethodNotAllowed)
+		return
+	}
+	vars := mux.Vars(r)
+	id, _ := strconv.ParseInt(vars["id"], 0, 64)
+	rid := vars["rid"]
+	c, err := models.GetCampaign(id, ctx.Get(r, "user_id").(int64))
+	if err != nil {
+		JSONResponse(w, models.Response{Success: false, Message: "Campaign not found"}, http.StatusNotFound)
+		return
+	}
+	result, err := models.GetResult(rid)
+	if err != nil {
+		JSONResponse(w, models.Response{Success: false, Message: fmt.Sprintf("result %q not found", rid)}, http.StatusNotFound)
+		return
+	}
+	if result.CampaignId != c.Id {
+		JSONResponse(w, models.Response{Success: false, Message: fmt.Sprintf("result %q does not belong to this campaign", rid)}, http.StatusBadRequest)
+		return
+	}
+	// Don't create a duplicate timeline event if the recipient is already
+	// flagged as reported.
+	if result.Reported {
+		JSONResponse(w, models.Response{Success: true, Message: "Recipient already marked as reported"}, http.StatusOK)
+		return
+	}
+	if err := result.HandleEmailReport(models.EventDetails{}); err != nil {
+		log.Error(err)
+		JSONResponse(w, models.Response{Success: false, Message: "Error marking recipient as reported"}, http.StatusInternalServerError)
+		return
+	}
+	JSONResponse(w, models.Response{Success: true, Message: "Recipient marked as reported"}, http.StatusOK)
+}
+
 // buildResendMailLog validates that the result identified by rid belongs to the
 // given campaign and prepares a fresh, locked maillog ready to be queued for an
 // immediate resend.
