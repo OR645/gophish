@@ -43,6 +43,25 @@
                 <h2>Sign in</h2>
                 <p class="subtitle">Access the campaign console</p>
                 {{template "flashes" .Flashes}}
+                {{if .SSOEnabled}}
+                <a class="btn btn-lg btn-primary btn-block" style="display:flex;align-items:center;justify-content:center;gap:10px;text-decoration:none;" href="/auth/login{{if .Next}}?next={{.Next}}{{end}}">
+                    <svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true">
+                        <rect x="0" y="0" width="10" height="10" fill="#f25022"/>
+                        <rect x="11" y="0" width="10" height="10" fill="#7fba00"/>
+                        <rect x="0" y="11" width="10" height="10" fill="#00a4ef"/>
+                        <rect x="11" y="11" width="10" height="10" fill="#ffb900"/>
+                    </svg>
+                    Sign in with Microsoft
+                </a>
+                {{end}}
+                {{if and .SSOEnabled .PasswordLogin}}
+                <div style="display:flex;align-items:center;gap:10px;margin:16px 0;color:var(--ink-faint);font-size:11px;">
+                    <span style="flex:1;height:1px;background:currentColor;opacity:.3;"></span>
+                    OR
+                    <span style="flex:1;height:1px;background:currentColor;opacity:.3;"></span>
+                </div>
+                {{end}}
+                {{if .PasswordLogin}}
                 <form class="form-signin" action="" method="POST">
                     <div class="field" style="margin-bottom:14px;">
                         <label for="username">Username</label>
@@ -53,8 +72,9 @@
                         <input type="password" id="password" name="password" class="form-control" placeholder="Password" autocomplete="off" required>
                     </div>
                     <input type="hidden" name="csrf_token" value="{{.Token}}" />
-                    <button class="btn btn-lg btn-primary btn-block" type="submit">Sign in to console</button>
+                    <button class="btn btn-lg btn-{{if .SSOEnabled}}default{{else}}primary{{end}} btn-block" type="submit">Sign in to console</button>
                 </form>
+                {{end}}
                 <div class="row" style="justify-content:center;display:flex;gap:8px;color:var(--ink-faint);font-size:12px;margin-top:16px;">
                     <i class="fa fa-shield"></i> Protected by your organization's policy
                 </div>

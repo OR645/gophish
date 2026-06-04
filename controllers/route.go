@@ -39,6 +39,7 @@ type AdminServer struct {
 	worker  worker.Worker
 	config  config.AdminServer
 	limiter *ratelimit.PostLimiter
+	oidc    *oidcSettings
 }
 
 var defaultTLSConfig = &tls.Config{
@@ -83,6 +84,14 @@ func NewAdminServer(config config.AdminServer, options ...AdminServerOption) *Ad
 		server:  defaultServer,
 		limiter: defaultLimiter,
 		config:  config,
+		oidc:    loadOIDCSettings(),
+	}
+	if as.oidc.Enabled() {
+		if as.oidc.PasswordLoginAllowed() {
+			log.Info("Microsoft 365 SSO enabled (password login also allowed)")
+		} else {
+			log.Info("Microsoft 365 SSO enabled (password login disabled)")
+		}
 	}
 	for _, opt := range options {
 		opt(as)
@@ -125,6 +134,8 @@ func (as *AdminServer) registerRoutes() {
 	// Base Front-end routes
 	router.HandleFunc("/", mid.Use(as.Base, mid.RequireLogin))
 	router.HandleFunc("/login", mid.Use(as.Login, as.limiter.Limit))
+	router.HandleFunc("/auth/login", mid.Use(as.OIDCLogin, as.limiter.Limit))
+	router.HandleFunc("/auth/callback", mid.Use(as.OIDCCallback, as.limiter.Limit))
 	router.HandleFunc("/logout", mid.Use(as.Logout, mid.RequireLogin))
 	router.HandleFunc("/reset_password", mid.Use(as.ResetPassword, mid.RequireLogin))
 	router.HandleFunc("/campaigns", mid.Use(as.Campaigns, mid.RequireLogin))
@@ -322,15 +333,34 @@ func (as *AdminServer) nextOrIndex(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, next, http.StatusFound)
 }
 
+// loginTemplateParams holds the data rendered into the login template,
+// including which sign-in methods are available.
+type loginTemplateParams struct {
+	User          models.User
+	Title         string
+	Flashes       []interface{}
+	Token         string
+	SSOEnabled    bool
+	PasswordLogin bool
+	Next          string
+}
+
+// newLoginParams returns the login template parameters based on the SSO
+// configuration and the requested "next" redirect.
+func (as *AdminServer) newLoginParams(r *http.Request) loginTemplateParams {
+	return loginTemplateParams{
+		Title:         "Login",
+		Token:         csrf.Token(r),
+		SSOEnabled:    as.oidc.Enabled(),
+		PasswordLogin: as.oidc.PasswordLoginAllowed(),
+		Next:          r.URL.Query().Get("next"),
+	}
+}
+
 func (as *AdminServer) handleInvalidLogin(w http.ResponseWriter, r *http.Request, message string) {
 	session := ctx.Get(r, "session").(*sessions.Session)
 	Flash(w, r, "danger", message)
-	params := struct {
-		User    models.User
-		Title   string
-		Flashes []interface{}
-		Token   string
-	}{Title: "Login", Token: csrf.Token(r)}
+	params := as.newLoginParams(r)
 	params.Flashes = session.Flashes()
 	session.Save(r, w)
 	templates := template.New("template")
@@ -371,12 +401,7 @@ func (as *AdminServer) Impersonate(w http.ResponseWriter, r *http.Request) {
 // Login handles the authentication flow for a user. If credentials are valid,
 // a session is created
 func (as *AdminServer) Login(w http.ResponseWriter, r *http.Request) {
-	params := struct {
-		User    models.User
-		Title   string
-		Flashes []interface{}
-		Token   string
-	}{Title: "Login", Token: csrf.Token(r)}
+	params := as.newLoginParams(r)
 	session := ctx.Get(r, "session").(*sessions.Session)
 	switch {
 	case r.Method == "GET":
@@ -389,6 +414,11 @@ func (as *AdminServer) Login(w http.ResponseWriter, r *http.Request) {
 		}
 		template.Must(templates, err).ExecuteTemplate(w, "base", params)
 	case r.Method == "POST":
+		// Reject password logins when SSO is enforced
+		if !as.oidc.PasswordLoginAllowed() {
+			as.handleInvalidLogin(w, r, "Password login is disabled. Please sign in with Microsoft.")
+			return
+		}
 		// Find the user with the provided username
 		username, password := r.FormValue("username"), r.FormValue("password")
 		u, err := models.GetUserByUsername(username)
