@@ -726,7 +726,7 @@ body.auth > .container { width: 100%; max-width: none; margin: 0; padding: 0; }
 .login-aside .glow { position: absolute; width: 520px; height: 520px; border-radius: 50%; background: radial-gradient(circle, var(--accent-soft), transparent 65%); top: -120px; right: -150px; filter: blur(10px); }
 .login-aside .gridbg { position: absolute; inset: 0; background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px); background-size: 44px 44px; mask-image: radial-gradient(circle at 70% 30%, #000, transparent 75%); opacity: .5; }
 /* Yazamco logo on the auth aside */
-.login-aside .brand-logo { position: relative; display: block; width: 210px; max-width: 52%; }
+.login-aside .brand-logo { position: relative; display: block; width: 300px; max-width: 72%; }
 .login-aside .brand-logo img { display: block; width: 100%; height: auto; }
 .login-aside .brand-logo .for-light { display: none; }
 :root[data-theme="light"] .login-aside .brand-logo .for-dark { display: none; }
