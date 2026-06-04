@@ -59,7 +59,11 @@ func (as *Server) CompaniesHudu(w http.ResponseWriter, r *http.Request) {
 	}
 	cs, err := models.GetHuduCompanies()
 	if err != nil {
-		JSONResponse(w, models.Response{Success: false, Message: "Error fetching companies from Hudu"}, http.StatusBadGateway)
+		msg := "Error fetching companies from Hudu"
+		if err == models.ErrHuduNotConfigured {
+			msg = err.Error()
+		}
+		JSONResponse(w, models.Response{Success: false, Message: msg}, http.StatusBadGateway)
 		return
 	}
 	JSONResponse(w, cs, http.StatusOK)

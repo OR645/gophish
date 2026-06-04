@@ -130,21 +130,27 @@ type huduCompaniesEnvelope struct {
 }
 
 // Default Hudu companies webhook endpoint, used when no override is present in
-// config.json (hudu_companies_url / hudu_companies_secret).
+// config.json (hudu_companies_url). The shared secret is NOT defaulted - it
+// must be provided via config (hudu_companies_secret) so it never lives in
+// source control.
 const defaultHuduCompaniesURL = "https://n8n.yazamco.pro/webhook/hudu-companies"
-const defaultHuduCompaniesSecret = "N0RBD_pxyVuB0AhYPQU7LesfalFhp9HO-3Mk9AmgPjI"
+
+// ErrHuduNotConfigured is returned when the hudu-companies webhook secret is
+// missing from config.json.
+var ErrHuduNotConfigured = errors.New("hudu companies webhook not configured: set hudu_companies_secret in config.json")
 
 // GetHuduCompanies fetches the company list from the n8n hudu-companies
 // webhook server-side (so the shared secret never reaches the browser) and
 // returns the non-archived companies.
 func GetHuduCompanies() ([]HuduCompany, error) {
-	url := defaultHuduCompaniesURL
-	secret := defaultHuduCompaniesSecret
-	if conf != nil && conf.HuduCompaniesURL != "" {
-		url = conf.HuduCompaniesURL
+	if conf == nil || conf.HuduCompaniesSecret == "" {
+		log.Error(ErrHuduNotConfigured)
+		return nil, ErrHuduNotConfigured
 	}
-	if conf != nil && conf.HuduCompaniesSecret != "" {
-		secret = conf.HuduCompaniesSecret
+	url := defaultHuduCompaniesURL
+	secret := conf.HuduCompaniesSecret
+	if conf.HuduCompaniesURL != "" {
+		url = conf.HuduCompaniesURL
 	}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {

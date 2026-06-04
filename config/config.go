@@ -42,10 +42,11 @@ type Config struct {
 	// any additional steps. N8nWebhookSecret is used to HMAC-sign the payload.
 	N8nWebhookURL    string `json:"n8n_webhook_url"`
 	N8nWebhookSecret string `json:"n8n_webhook_secret"`
-	// HuduCompaniesURL / HuduCompaniesSecret optionally override the n8n
-	// hudu-companies webhook (GET, x-techform-secret header) used to populate
-	// the company picker on the Companies page. Defaults live in
-	// models/company.go.
+	// HuduCompaniesURL / HuduCompaniesSecret configure the n8n hudu-companies
+	// webhook (GET, x-techform-secret header) used to populate the company
+	// picker on the Companies page. The URL defaults to the yazamco n8n
+	// endpoint (see models/company.go); the secret is required and must be set
+	// here - it is intentionally not present in source control.
 	HuduCompaniesURL    string `json:"hudu_companies_url"`
 	HuduCompaniesSecret string `json:"hudu_companies_secret"`
 }

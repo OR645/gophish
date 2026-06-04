@@ -161,9 +161,10 @@ const loadHuduCompanies = () => {
             $("#hudu_status").text(huduCompanies.length + " companies available — start typing to search");
             renderHuduResults($("#hudu_search").val());
         })
-        .error(() => {
+        .error((data) => {
             huduLoading = false;
-            $("#hudu_status").text("Couldn't load the Hudu company list — you can still fill the fields manually.");
+            let msg = (data && data.responseJSON && data.responseJSON.message) || "";
+            $("#hudu_status").text((msg || "Couldn't load the Hudu company list") + " — you can still fill the fields manually.");
         });
 };
 
