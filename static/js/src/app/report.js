@@ -232,7 +232,10 @@ function captureHtmlToImage(html, width) {
         iframe.style.left = "-10000px"
         iframe.style.top = "0"
         iframe.style.width = width + "px"
-        iframe.style.height = "600px"
+        // Start at a realistic desktop viewport height so pages laid out with
+        // 100vh (e.g. full-screen login pages) render naturally before we
+        // measure their real content height.
+        iframe.style.height = "900px"
         iframe.style.border = "0"
         iframe.style.background = "#ffffff"
         var done = false
@@ -256,17 +259,29 @@ function captureHtmlToImage(html, width) {
             }).then(function () {
                 try {
                     var body = doc.body
-                    var h = Math.min(Math.max(body.scrollHeight, doc.documentElement.scrollHeight, 400), 5000)
+                    var docEl = doc.documentElement
+                    // Full content height - measured from scrollHeight so the
+                    // WHOLE page is captured, not just the first viewport.
+                    var h = Math.max(body.scrollHeight, docEl.scrollHeight, body.offsetHeight, docEl.offsetHeight, 400)
                     iframe.style.height = h + "px"
+                    // Browsers cap canvas dimensions (~16384px/side). Pick a scale
+                    // that keeps both sides under a safe cap so a long page is
+                    // captured in full (downscaled) instead of being truncated;
+                    // never upscale past 2x.
+                    var MAX_CANVAS_PX = 14000
+                    var scale = Math.min(2, MAX_CANVAS_PX / Math.max(width, 1), MAX_CANVAS_PX / Math.max(h, 1))
+                    if (window.console) console.log("[report] capturing", width + "x" + h, "@", scale + "x")
                     window.html2canvas(body, {
                         backgroundColor: "#ffffff",
                         useCORS: true,
                         allowTaint: false,
-                        scale: 2, // 2x for a crisp, high-resolution screenshot
+                        scale: scale,
                         width: width,
                         height: h,
                         windowWidth: width,
                         windowHeight: h,
+                        scrollX: 0,
+                        scrollY: 0,
                         imageTimeout: 15000,
                         logging: false,
                         onclone: function (clonedDoc) {
@@ -323,7 +338,9 @@ function captureCampaignAssets(campaign) {
     var pageHtml = renderGophishTemplate((campaign.page || {}).html || "", campaign, recipient)
     return Promise.all([
         emailHtml ? captureHtmlToImage(emailHtml, 800) : Promise.resolve(null),
-        pageHtml ? captureHtmlToImage(pageHtml, 1000) : Promise.resolve(null)
+        // Landing pages are usually built for a desktop viewport - capture at a
+        // realistic desktop width so the layout matches what the victim saw.
+        pageHtml ? captureHtmlToImage(pageHtml, 1280) : Promise.resolve(null)
     ]).then(function (imgs) {
         return { emailImg: imgs[0], pageImg: imgs[1] }
     })
