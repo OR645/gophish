@@ -161,6 +161,55 @@ function waitForDocumentReady(doc) {
     })
 }
 
+// Remote images (logos, backgrounds) in real templates are usually served
+// without CORS headers, so html2canvas can't rasterize them. We route them
+// through a CORS-enabled image proxy so they can be drawn without tainting the
+// canvas. Swap REPORT_IMAGE_PROXY if you prefer a different / self-hosted proxy
+// (it must accept ?url=<encoded image url> and return the image with
+// Access-Control-Allow-Origin).
+var REPORT_IMAGE_PROXY = "https://images.weserv.nl/?url="
+
+function reportProxyImageUrl(u) {
+    // weserv expects the source without a protocol: "ssl:" prefix for https,
+    // bare host for http. (This long-standing format is the most compatible.)
+    var src = u.replace(/^https:\/\//i, "ssl:").replace(/^http:\/\//i, "")
+    return REPORT_IMAGE_PROXY + encodeURIComponent(src)
+}
+
+// proxifyImagesForCapture - rewrites every remote (absolute http/https) image in
+// the document to go through the CORS proxy: both <img src> and CSS
+// background-image. Backgrounds are read from computed style so images defined
+// in external stylesheets are caught too, then overridden inline. Returns true
+// if anything changed, so the caller knows to wait for the new loads.
+function proxifyImagesForCapture(doc) {
+    var changed = false
+    var isRemote = function (u) {
+        return u && /^https?:\/\//i.test(u) && u.indexOf("images.weserv.nl") === -1
+    }
+    var view = doc.defaultView || window
+    // <img> elements - img.src is the absolute resolved URL.
+    Array.prototype.slice.call(doc.images || []).forEach(function (img) {
+        var abs = img.src || img.getAttribute("src") || ""
+        if (!isRemote(abs)) return
+        img.removeAttribute("srcset") // srcset would override our rewritten src
+        img.crossOrigin = "anonymous"
+        img.src = reportProxyImageUrl(abs)
+        changed = true
+    })
+    // CSS background-image (computed -> catches external stylesheets too).
+    Array.prototype.slice.call(doc.querySelectorAll("*")).forEach(function (el) {
+        var bg
+        try { bg = view.getComputedStyle(el).backgroundImage } catch (e) { return }
+        if (!bg || bg.indexOf("url(") === -1 || bg.indexOf("images.weserv.nl") !== -1) return
+        var replaced = bg.replace(/url\(\s*(["']?)(https?:\/\/[^)"']+)\1\s*\)/gi, function (m, q, url) {
+            changed = true
+            return 'url("' + reportProxyImageUrl(url) + '")'
+        })
+        if (replaced !== bg) el.style.backgroundImage = replaced
+    })
+    return changed
+}
+
 // captureHtmlToImage - renders an HTML string off-screen and rasterizes it to a
 // PNG data URI with html2canvas (sharp), producing a real screenshot-style
 // image. Resolves to null (never rejects) on failure - any failure is logged to
@@ -199,8 +248,12 @@ function captureHtmlToImage(html, width) {
             // when the iframe is inserted: ignore it and wait for the real srcdoc
             // content so we don't capture (and lock in) an empty document.
             if (!doc || !doc.body || (!doc.body.childNodes.length && html)) return
-            // Wait until images + fonts have actually loaded before capturing.
+            // Wait for CSS/images to load, route remote images through the CORS
+            // proxy, then wait again for the proxied versions before capturing.
             waitForDocumentReady(doc).then(function () {
+                var changed = proxifyImagesForCapture(doc)
+                return changed ? waitForDocumentReady(doc) : null
+            }).then(function () {
                 try {
                     var body = doc.body
                     var h = Math.min(Math.max(body.scrollHeight, doc.documentElement.scrollHeight, 400), 5000)
@@ -217,12 +270,13 @@ function captureHtmlToImage(html, width) {
                         imageTimeout: 15000,
                         logging: false,
                         onclone: function (clonedDoc) {
-                            // Force a solid background and kill animations so the
-                            // rasterized frame is stable and prints with its bg.
+                            // Kill animations/transitions so the rasterized frame
+                            // is stable. (Don't touch background - that would wipe
+                            // the proxied background-image; html2canvas already
+                            // paints a white base via backgroundColor above.)
                             try {
                                 var st = clonedDoc.createElement("style")
-                                st.textContent = "*{animation:none !important;transition:none !important;}" +
-                                    "html,body{background:#ffffff !important;}"
+                                st.textContent = "*{animation:none !important;transition:none !important;}"
                                 clonedDoc.head.appendChild(st)
                             } catch (e) { /* non-fatal */ }
                         }
