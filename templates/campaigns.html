@@ -111,31 +111,23 @@
                                     </span>
                                 </div>
                             </div>
-                            <hr class="divider" style="margin:2px 0;">
-                            <div class="field">
-                                <label>Email templates
-                                    <i class="fa fa-question-circle" data-toggle="tooltip" data-placement="right" title="Pick one or more templates. When several are selected, each recipient is randomly assigned one of them."></i>
-                                </label>
-                                <div class="stack" id="templateChoices" style="gap:9px;"><div class="minilist-empty">Loading templates…</div></div>
-                                <div class="mono" id="templatesNote" style="font-size:11.5px;color:var(--ink-dim);margin-top:8px;"></div>
-                            </div>
                         </div>
                     </div>
 
-                    <!-- STEP 1 · Delivery -->
+                    <!-- STEP 1 · Content -->
                     <div class="step-pane" data-step="1" hidden>
-                        <div class="step-head"><h4>Delivery</h4><p>Landing page, listener domain, sender and targets.</p></div>
+                        <div class="step-head"><h4>Content</h4><p>Email templates, landing page and sending profile.</p></div>
                         <div class="field">
-                            <label>Landing page</label>
-                            <div class="stack" id="pageChoices" style="gap:9px;"><div class="minilist-empty">Loading pages…</div></div>
+                            <label>Email templates
+                                <i class="fa fa-question-circle" data-toggle="tooltip" data-placement="right" title="Pick one or more templates. When several are selected, each recipient is randomly assigned one of them."></i>
+                            </label>
+                            <div class="stack" id="templateChoices" style="gap:9px;"><div class="minilist-empty">Loading templates…</div></div>
+                            <div class="mono" id="templatesNote" style="font-size:11.5px;color:var(--ink-dim);margin-top:8px;"></div>
                         </div>
                         <hr class="divider">
                         <div class="field">
-                            <label for="url">Listener URL
-                                <i class="fa fa-question-circle" data-toggle="tooltip" data-placement="right" title="The phishing link targets will click. Only domains managed in the Domains tab can be used."></i>
-                            </label>
-                            <select class="form-control" id="url"><option></option></select>
-                            <div class="mono" id="urlNote" style="font-size:11.5px;color:var(--ink-dim);margin-top:6px;"></div>
+                            <label>Landing page</label>
+                            <div class="stack" id="pageChoices" style="gap:9px;"><div class="minilist-empty">Loading pages…</div></div>
                         </div>
                         <hr class="divider">
                         <div class="field">
@@ -148,6 +140,18 @@
                                 <button type="button" data-toggle="modal" data-backdrop="static" data-target="#sendTestEmailModal" class="btn btn-sm"><i class="fa fa-envelope"></i>&nbsp;Send Test Email</button>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- STEP 2 · Targets -->
+                    <div class="step-pane" data-step="2" hidden>
+                        <div class="step-head"><h4>Targets</h4><p>Listener domain and target groups.</p></div>
+                        <div class="field">
+                            <label for="url">Listener URL
+                                <i class="fa fa-question-circle" data-toggle="tooltip" data-placement="right" title="The phishing link targets will click. Only domains managed in the Domains tab can be used."></i>
+                            </label>
+                            <select class="form-control" id="url"><option></option></select>
+                            <div class="mono" id="urlNote" style="font-size:11.5px;color:var(--ink-dim);margin-top:6px;"></div>
+                        </div>
                         <hr class="divider">
                         <div class="field">
                             <label>Targets</label>
@@ -156,8 +160,8 @@
                         </div>
                     </div>
 
-                    <!-- STEP 2 · Review & Launch -->
-                    <div class="step-pane" data-step="2" hidden>
+                    <!-- STEP 3 · Review & Launch -->
+                    <div class="step-pane" data-step="3" hidden>
                         <div class="step-head"><h4>Review &amp; Launch</h4><p>Set the schedule, confirm everything, then launch.</p></div>
                         <div class="soc-grid-2" style="gap:12px;">
                             <div class="field">

@@ -279,19 +279,19 @@ function wizValidate() {
         return fail("Please give the campaign a name.", 0)
     }
     if (!wizState.templates.length) {
-        return fail("Select at least one email template.", 0)
+        return fail("Select at least one email template.", 1)
     }
     if (!wizState.page) {
         return fail("Select a landing page.", 1)
     }
-    if (!wizState.url) {
-        return fail("Select a listener URL (domain).", 1)
-    }
     if (!wizState.profile) {
         return fail("Select a sending profile.", 1)
     }
+    if (!wizState.url) {
+        return fail("Select a listener URL (domain).", 2)
+    }
     if (!wizState.groups.length) {
-        return fail("Select at least one target group.", 1)
+        return fail("Select at least one target group.", 2)
     }
     return true
 }
@@ -572,14 +572,15 @@ function setupOptions() {
 
 /* ============================================================
    SOC cx campaign wizard
-   A compact 3-step flow: Campaign (name/company/templates),
-   Delivery (page/URL/profile/targets) and Review & Launch.
+   A 4-step flow: Campaign (name/company), Content (templates/
+   page/profile), Targets (listener URL/groups) and Review & Launch.
    Card clicks mutate wizState; sync helpers mark the cards.
    ============================================================ */
-var WIZ_LABELS = ["Campaign", "Delivery", "Review"]
+var WIZ_LABELS = ["Campaign", "Content", "Targets", "Review"]
 var WIZ_DESC = [
-    "Name the simulation, pick a company and choose the email templates.",
-    "Choose the landing page, listener domain, sender and targets.",
+    "Name your simulation and pick a company.",
+    "Choose the email templates, landing page and sending profile.",
+    "Pick the listener domain and the target groups.",
     "Set the schedule, confirm everything, then launch."
 ]
 var wizStep = 0
