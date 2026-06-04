@@ -2,7 +2,6 @@ package models
 
 import (
 	"errors"
-	"math/rand"
 	"net/url"
 	"time"
 
@@ -650,11 +649,14 @@ func PostCampaign(c *Campaign, uid int64) error {
 			}
 			resultMap[t.Email] = true
 			sendDate := c.generateSendDate(recipientIndex, totalRecipients)
-			// Randomly assign a template from the rotation pool to this
-			// recipient (only recorded when there is an actual pool).
+			// Assign a template from the rotation pool to this recipient in
+			// round-robin order so the templates are spread as evenly as
+			// possible. This guarantees that, e.g., two templates over two
+			// recipients each go to a different person rather than (randomly)
+			// both landing on the same template.
 			resultTemplateId := int64(0)
 			if len(templatePool) > 1 {
-				resultTemplateId = templatePool[rand.Intn(len(templatePool))].Id
+				resultTemplateId = templatePool[recipientIndex%len(templatePool)].Id
 			}
 			r := &Result{
 				BaseRecipient: BaseRecipient{

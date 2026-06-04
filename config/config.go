@@ -49,6 +49,15 @@ type Config struct {
 	// here - it is intentionally not present in source control.
 	HuduCompaniesURL    string `json:"hudu_companies_url"`
 	HuduCompaniesSecret string `json:"hudu_companies_secret"`
+	// SpamReportURL / SpamReportSecret configure the n8n spam-report webhook
+	// triggered from the campaign results page ("Spam Report" button). gophish
+	// POSTs the campaign's per-recipient results (email, status, gophish id,
+	// the email subject each received, ...) and does not wait for a response.
+	// The URL defaults to the yazamco n8n endpoint (see models/spamreport.go);
+	// the secret is required and must be set here - it is intentionally not
+	// present in source control - and is sent in the x-techform-secret header.
+	SpamReportURL    string `json:"spam_report_url"`
+	SpamReportSecret string `json:"spam_report_secret"`
 }
 
 // Version contains the current gophish version

@@ -137,6 +137,29 @@ func (as *Server) CampaignComplete(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// CampaignSpamReport fires the n8n spam-report webhook for a campaign. The
+// webhook is sent in the background (fire-and-forget): this handler returns as
+// soon as the request is queued without waiting for the webhook's response.
+// It accepts POST /campaigns/{id}/spam-report.
+func (as *Server) CampaignSpamReport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		JSONResponse(w, models.Response{Success: false, Message: "Method not allowed"}, http.StatusMethodNotAllowed)
+		return
+	}
+	vars := mux.Vars(r)
+	id, _ := strconv.ParseInt(vars["id"], 0, 64)
+	c, err := models.GetCampaign(id, ctx.Get(r, "user_id").(int64))
+	if err != nil {
+		JSONResponse(w, models.Response{Success: false, Message: "Campaign not found"}, http.StatusNotFound)
+		return
+	}
+	if err := models.SendSpamReportWebhook(&c); err != nil {
+		JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusInternalServerError)
+		return
+	}
+	JSONResponse(w, models.Response{Success: true, Message: "Spam report webhook sent"}, http.StatusOK)
+}
+
 // buildResendMailLog validates that the result identified by rid belongs to the
 // given campaign and prepares a fresh, locked maillog ready to be queued for an
 // immediate resend.

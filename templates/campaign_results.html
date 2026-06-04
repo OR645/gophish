@@ -34,6 +34,9 @@
                 <button id="report_button" type="button" class="btn btn-sm btn-success" data-toggle="tooltip" title="Generate phishing assessment report" onclick="generateReport()">
                     <i class="fa fa-file-text-o"></i> Report
                 </button>
+                <button id="spam_report_button" type="button" class="btn btn-sm btn-info" data-toggle="tooltip" title="Send the recipient results to the spam-report webhook (does not wait for a response)" onclick="sendSpamReport()">
+                    <i class="fa fa-shield"></i> Spam Report
+                </button>
                 <button id="complete_button" type="button" class="btn btn-sm btn-primary" data-toggle="tooltip" onclick="completeCampaign()">
                     <i class="fa fa-flag-checkered"></i> Complete
                 </button>

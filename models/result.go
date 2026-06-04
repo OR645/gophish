@@ -39,6 +39,11 @@ type Result struct {
 	// It is 0 for campaigns with a single template (the campaign's template is
 	// used) and set when a campaign rotates between multiple templates.
 	TemplateId int64 `json:"template_id"`
+	// EmailSubject records the rendered subject line of the email this recipient
+	// actually received. Because campaigns may rotate between templates (and the
+	// subject can contain per-recipient template variables), the subject is
+	// dynamic per recipient; it is filled in at send time by MailLog.Generate.
+	EmailSubject string `json:"email_subject"`
 	BaseRecipient
 }
 

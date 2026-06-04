@@ -117,6 +117,11 @@ var api = {
         // POST /campaigns/:id/results/resend
         resendBulk: function (id, rids) {
             return query("/campaigns/" + id + "/results/resend", "POST", { ids: rids }, true)
+        },
+        // spamReport() - Fires the n8n spam-report webhook (fire-and-forget) at
+        // POST /campaigns/:id/spam-report
+        spamReport: function (id) {
+            return query("/campaigns/" + id + "/spam-report", "POST", {}, true)
         }
     },
     // groups contains the endpoints for /groups

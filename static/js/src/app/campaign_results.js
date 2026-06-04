@@ -1056,6 +1056,32 @@ function generateReport() {
     openCampaignReport(campaign.id)
 }
 
+// sendSpamReport fires the n8n spam-report webhook for this campaign. The
+// request is fire-and-forget on the server (it does not wait for the webhook's
+// response), so we simply notify the user once it has been queued.
+function sendSpamReport() {
+    var btn = $('#spam_report_button')
+    var originalHtml = btn.html()
+    btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Sending')
+    api.campaignId.spamReport(campaign.id)
+        .success(function (msg) {
+            Swal.fire(
+                'Spam Report Sent!',
+                (msg && msg.message) || 'The recipient results have been sent to the spam-report webhook.',
+                'success'
+            )
+            btn.prop('disabled', false).html(originalHtml)
+        })
+        .error(function (data) {
+            var message = 'Unable to send the spam report.'
+            if (data && data.responseJSON && data.responseJSON.message) {
+                message = data.responseJSON.message
+            }
+            Swal.fire('Error', message, 'error')
+            btn.prop('disabled', false).html(originalHtml)
+        })
+}
+
 function report_mail(rid, cid) {
     Swal.fire({
         title: "Are you sure?",

@@ -290,6 +290,14 @@ func (m *MailLog) Generate(msg *gomail.Message) error {
 	if subject != "" {
 		msg.SetHeader("Subject", subject)
 	}
+	// Record the rendered subject on the result so the per-recipient title is
+	// preserved (it is dynamic when a campaign rotates between templates).
+	if subject != r.EmailSubject {
+		if err := db.Model(&Result{}).Where("r_id = ?", r.RId).
+			Update("email_subject", subject).Error; err != nil {
+			log.Warn(err)
+		}
+	}
 
 	msg.SetHeader("To", r.FormatAddress())
 	if tmpl.Text != "" {
