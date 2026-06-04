@@ -149,10 +149,18 @@ function waitForDocumentReady(doc) {
 }
 
 // captureHtmlToImage - renders an HTML string off-screen and rasterizes it to a
-// PNG data URI with html2canvas at 2x scale (sharp), producing a real
-// screenshot-style image. Resolves to null (never rejects) on failure.
+// PNG data URI with html2canvas (sharp), producing a real screenshot-style
+// image. Resolves to null (never rejects) on failure - any failure is logged to
+// the console under the "[report]" prefix so it can be diagnosed.
+//
+// Remote images without CORS headers are simply omitted by html2canvas (the
+// canvas stays clean and toDataURL still works), so they degrade gracefully and
+// are not a capture failure - any real failure is surfaced in the console.
 function captureHtmlToImage(html, width) {
-    if (typeof window.html2canvas !== "function") return Promise.resolve(null)
+    if (typeof window.html2canvas !== "function") {
+        if (window.console) console.warn("[report] html2canvas not loaded - cannot capture screenshot, using inline fallback")
+        return Promise.resolve(null)
+    }
     return new Promise(function (resolve) {
         var iframe = document.createElement("iframe")
         // allow-same-origin lets us read the rendered DOM; no allow-scripts so
@@ -174,6 +182,10 @@ function captureHtmlToImage(html, width) {
         }
         iframe.onload = function () {
             var doc = iframe.contentDocument
+            // Guard against the initial about:blank load event some browsers fire
+            // when the iframe is inserted: ignore it and wait for the real srcdoc
+            // content so we don't capture (and lock in) an empty document.
+            if (!doc || !doc.body || (!doc.body.childNodes.length && html)) return
             // Wait until images + fonts have actually loaded before capturing.
             waitForDocumentReady(doc).then(function () {
                 try {
@@ -189,22 +201,46 @@ function captureHtmlToImage(html, width) {
                         height: h,
                         windowWidth: width,
                         windowHeight: h,
-                        imageTimeout: 8000,
-                        logging: false
+                        imageTimeout: 15000,
+                        logging: false,
+                        onclone: function (clonedDoc) {
+                            // Force a solid background and kill animations so the
+                            // rasterized frame is stable and prints with its bg.
+                            try {
+                                var st = clonedDoc.createElement("style")
+                                st.textContent = "*{animation:none !important;transition:none !important;}" +
+                                    "html,body{background:#ffffff !important;}"
+                                clonedDoc.head.appendChild(st)
+                            } catch (e) { /* non-fatal */ }
+                        }
                     }).then(function (canvas) {
                         var url = null
-                        try { url = canvas.toDataURL("image/png") } catch (e) { url = null }
+                        try {
+                            url = canvas.toDataURL("image/png")
+                        } catch (e) {
+                            if (window.console) console.warn("[report] canvas.toDataURL failed (tainted canvas / cross-origin image):", e)
+                            url = null
+                        }
                         cleanup(url)
-                    }).catch(function () { cleanup(null) })
+                    }).catch(function (e) {
+                        if (window.console) console.warn("[report] html2canvas render failed:", e)
+                        cleanup(null)
+                    })
                 } catch (e) {
+                    if (window.console) console.warn("[report] screenshot capture threw:", e)
                     cleanup(null)
                 }
             })
         }
         // Safety timeout in case onload/asset loading never completes.
-        setTimeout(function () { cleanup(null) }, 25000)
-        document.body.appendChild(iframe)
+        setTimeout(function () {
+            if (!done && window.console) console.warn("[report] screenshot capture timed out after 30s, using inline fallback")
+            cleanup(null)
+        }, 30000)
+        // Set srcdoc BEFORE inserting into the DOM so the first (and only) load
+        // event is for the real content, not the initial about:blank document.
         iframe.srcdoc = html
+        document.body.appendChild(iframe)
     })
 }
 
@@ -278,12 +314,28 @@ function buildHighRiskTimeline(campaign, sortedResults) {
     return header + '<div class="risk-timeline">' + items + '</div>'
 }
 
-// buildPreviewIframe - renders arbitrary HTML (email body / landing page) inside
-// a sandboxed iframe so it appears as a live "screenshot" in the report.
+// buildPreviewIframe - fallback used only when a PNG screenshot could not be
+// captured. Renders the email body / landing page inside a sandboxed iframe, but
+// frozen so it behaves like a static image rather than a live page: pointer
+// events are disabled (links/buttons are not clickable) and print-color-adjust
+// is forced so the background is included when the report is printed to PDF.
 function buildPreviewIframe(html, isHtml, emptyMsg) {
     if (!html) return '<div class="preview-empty">' + emptyMsg + '</div>'
-    var doc = isHtml ? html : '<pre style="white-space:pre-wrap;font-family:monospace;padding:16px;margin:0;">' + escapeHtml(html) + '</pre>'
-    return '<iframe class="preview-frame" sandbox srcdoc="' + reportAttrEscape(doc) + '"></iframe>'
+    // Inject a stylesheet that neutralizes interactivity and forces backgrounds
+    // to print. (The sandbox has no allow-scripts, so the content's own JS never
+    // runs; this only needs to handle links/forms and print color.)
+    var freezeStyle = '<style>' +
+        'html{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}' +
+        '*{pointer-events:none !important;cursor:default !important;}' +
+        'a{text-decoration:none !important;}' +
+        '</style>'
+    var body = isHtml
+        ? html
+        : '<pre style="white-space:pre-wrap;font-family:monospace;padding:16px;margin:0;">' + escapeHtml(html) + '</pre>'
+    var doc = freezeStyle + body
+    // pointer-events:none on the iframe element itself blocks all interaction
+    // with the embedded document as a second line of defense.
+    return '<iframe class="preview-frame" style="pointer-events:none;" sandbox srcdoc="' + reportAttrEscape(doc) + '"></iframe>'
 }
 
 // screenshotOrFallback - prefers a captured PNG screenshot; falls back to a live
