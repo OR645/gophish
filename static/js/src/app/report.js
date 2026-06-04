@@ -285,13 +285,30 @@ function captureHtmlToImage(html, width) {
                         imageTimeout: 15000,
                         logging: false,
                         onclone: function (clonedDoc) {
-                            // Kill animations/transitions so the rasterized frame
-                            // is stable. (Don't touch background - that would wipe
-                            // the proxied background-image; html2canvas already
-                            // paints a white base via backgroundColor above.)
                             try {
                                 var st = clonedDoc.createElement("style")
-                                st.textContent = "*{animation:none !important;transition:none !important;}"
+                                st.textContent =
+                                    // Kill animations/transitions so the frame is
+                                    // stable (don't touch background - that would
+                                    // wipe the proxied background-image).
+                                    "*{animation:none !important;transition:none !important;}" +
+                                    // Real templates often define @font-face with a
+                                    // custom family (e.g. 'Segoe UI Webfont') that
+                                    // html2canvas mis-measures - text gets drawn at
+                                    // zero width / not at all (while <input>/button
+                                    // text, drawn on a separate path, still shows).
+                                    // Force a concrete system font that is visually
+                                    // identical so DOM text renders reliably.
+                                    "*{font-family:'Segoe UI',-apple-system,'Helvetica Neue',Arial,'Noto Sans Hebrew',sans-serif !important;}" +
+                                    // Views animated in with animation-fill-mode:both
+                                    // freeze at the hidden 0% keyframe when the
+                                    // animation doesn't run. Pin animated containers
+                                    // to their final visible state. NOTE: only reset
+                                    // transform on .animate (its transform is purely
+                                    // the slide animation) - never on the lightbox,
+                                    // whose transform centers the card.
+                                    ".animate{opacity:1 !important;transform:none !important;}" +
+                                    ".fade-in-lightbox,[class*='fade-in'],[class*='slide-in']{opacity:1 !important;}"
                                 clonedDoc.head.appendChild(st)
                             } catch (e) { /* non-fatal */ }
                         }
