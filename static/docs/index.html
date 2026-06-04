@@ -7,8 +7,22 @@
     <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui.css"
           integrity="sha384-wxLW6kwyHktdDGr6Pv1zgm/VGJh99lfUbzSn6HNHBENZlCN7W602k9VkGdxuFvPn" crossorigin="anonymous">
     <style>
-        /* ---- SOC dark theme for Swagger UI ---- */
+        /* ============================================================
+           Theme tokens. Light (day) mode is the default; dark (SOC)
+           mode is applied when <body> carries the .theme-dark class.
+           ============================================================ */
         :root {
+            --soc-accent: #178f7f;
+            /* Light / day palette */
+            --hdr-bg: #ffffff;
+            --hdr-border: #e3e8ee;
+            --hdr-text: #1b2733;
+            --page-bg: #fafbfc;
+            --btn-bg: #ffffff;
+            --btn-border: #d0d7de;
+            --btn-text: #1b2733;
+        }
+        body.theme-dark {
             --soc-bg: #0b1118;
             --soc-panel: #101924;
             --soc-panel-2: #15202e;
@@ -16,81 +30,135 @@
             --soc-text: #d7e2ee;
             --soc-muted: #8aa0b8;
             --soc-accent: #35d0ba;
+            /* Dark header / page tokens reuse the SOC palette */
+            --hdr-bg: var(--soc-panel);
+            --hdr-border: var(--soc-border);
+            --hdr-text: var(--soc-text);
+            --page-bg: var(--soc-bg);
+            --btn-bg: var(--soc-panel-2);
+            --btn-border: var(--soc-border);
+            --btn-text: var(--soc-text);
         }
-        html, body { margin: 0; background: var(--soc-bg); }
+
+        html, body { margin: 0; background: var(--page-bg); }
         .topbar { display: none; }
+
+        /* ---- Header (both themes) ---- */
         .soc-header {
             display: flex; align-items: center; gap: 14px;
-            padding: 14px 24px; background: var(--soc-panel);
-            border-bottom: 1px solid var(--soc-border);
+            padding: 14px 24px; background: var(--hdr-bg);
+            border-bottom: 1px solid var(--hdr-border);
             font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
         }
         .soc-header img { height: 30px; }
-        .soc-header .title { color: var(--soc-text); font-size: 16px; font-weight: 600; letter-spacing: .04em; }
+        .soc-header img.logo-dark { display: none; }
+        body.theme-dark .soc-header img.logo-dark { display: inline; }
+        body.theme-dark .soc-header img.logo-light { display: none; }
+        .soc-header .title { color: var(--hdr-text); font-size: 16px; font-weight: 600; letter-spacing: .04em; }
         .soc-header .badge {
-            margin-left: auto; color: var(--soc-accent); border: 1px solid var(--soc-accent);
+            color: var(--soc-accent); border: 1px solid var(--soc-accent);
             border-radius: 999px; padding: 3px 12px; font-size: 11px; letter-spacing: .12em;
             text-transform: uppercase;
         }
-        .swagger-ui, .swagger-ui .info .title, .swagger-ui .info li, .swagger-ui .info p,
-        .swagger-ui .info td, .swagger-ui .info th, .swagger-ui .info h1, .swagger-ui .info h2,
-        .swagger-ui .info h3, .swagger-ui .info h4, .swagger-ui .opblock-tag,
-        .swagger-ui .opblock .opblock-summary-description, .swagger-ui .opblock-description-wrapper p,
-        .swagger-ui .opblock-external-docs-wrapper, .swagger-ui .opblock-title_normal,
-        .swagger-ui table thead tr td, .swagger-ui table thead tr th,
-        .swagger-ui .parameter__name, .swagger-ui .parameter__type, .swagger-ui .parameter__in,
-        .swagger-ui .response-col_status, .swagger-ui .response-col_links,
-        .swagger-ui .responses-inner h4, .swagger-ui .responses-inner h5,
-        .swagger-ui .model, .swagger-ui .model-title, .swagger-ui section.models h4,
-        .swagger-ui .scheme-container .schemes-title, .swagger-ui label,
-        .swagger-ui .dialog-ux .modal-ux-content p, .swagger-ui .dialog-ux .modal-ux-content h4,
-        .swagger-ui .dialog-ux .modal-ux-header h3, .swagger-ui .auth-container .wrapper,
-        .swagger-ui .markdown p, .swagger-ui .markdown li, .swagger-ui .markdown h2, .swagger-ui .renderedMarkdown p,
-        .swagger-ui .tab li, .swagger-ui .opblock-section-header h4, .swagger-ui .opblock-section-header label {
+        .soc-header .spacer { margin-left: auto; }
+        /* ---- Theme toggle button ---- */
+        .theme-toggle {
+            display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+            background: var(--btn-bg); color: var(--btn-text);
+            border: 1px solid var(--btn-border); border-radius: 8px;
+            padding: 6px 12px; font-size: 13px; font-weight: 500;
+            font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+            transition: background .15s ease, border-color .15s ease;
+        }
+        .theme-toggle:hover { border-color: var(--soc-accent); }
+        .theme-toggle .icon { font-size: 15px; line-height: 1; }
+        .theme-toggle .label-dark { display: none; }
+        body.theme-dark .theme-toggle .label-dark { display: inline; }
+        body.theme-dark .theme-toggle .label-light { display: none; }
+
+        /* ============================================================
+           SOC dark overrides — only active under body.theme-dark.
+           In day mode none of these apply, so stock Swagger UI (light)
+           is shown.
+           ============================================================ */
+        body.theme-dark .swagger-ui,
+        body.theme-dark .swagger-ui .info .title, body.theme-dark .swagger-ui .info li, body.theme-dark .swagger-ui .info p,
+        body.theme-dark .swagger-ui .info td, body.theme-dark .swagger-ui .info th, body.theme-dark .swagger-ui .info h1, body.theme-dark .swagger-ui .info h2,
+        body.theme-dark .swagger-ui .info h3, body.theme-dark .swagger-ui .info h4, body.theme-dark .swagger-ui .opblock-tag,
+        body.theme-dark .swagger-ui .opblock .opblock-summary-description, body.theme-dark .swagger-ui .opblock-description-wrapper p,
+        body.theme-dark .swagger-ui .opblock-external-docs-wrapper, body.theme-dark .swagger-ui .opblock-title_normal,
+        body.theme-dark .swagger-ui table thead tr td, body.theme-dark .swagger-ui table thead tr th,
+        body.theme-dark .swagger-ui .parameter__name, body.theme-dark .swagger-ui .parameter__type, body.theme-dark .swagger-ui .parameter__in,
+        body.theme-dark .swagger-ui .response-col_status, body.theme-dark .swagger-ui .response-col_links,
+        body.theme-dark .swagger-ui .responses-inner h4, body.theme-dark .swagger-ui .responses-inner h5,
+        body.theme-dark .swagger-ui .model, body.theme-dark .swagger-ui .model-title, body.theme-dark .swagger-ui section.models h4,
+        body.theme-dark .swagger-ui .scheme-container .schemes-title, body.theme-dark .swagger-ui label,
+        body.theme-dark .swagger-ui .dialog-ux .modal-ux-content p, body.theme-dark .swagger-ui .dialog-ux .modal-ux-content h4,
+        body.theme-dark .swagger-ui .dialog-ux .modal-ux-header h3, body.theme-dark .swagger-ui .auth-container .wrapper,
+        body.theme-dark .swagger-ui .markdown p, body.theme-dark .swagger-ui .markdown li, body.theme-dark .swagger-ui .markdown h2, body.theme-dark .swagger-ui .renderedMarkdown p,
+        body.theme-dark .swagger-ui .tab li, body.theme-dark .swagger-ui .opblock-section-header h4, body.theme-dark .swagger-ui .opblock-section-header label {
             color: var(--soc-text);
         }
-        .swagger-ui .info .description, .swagger-ui .parameter__extension,
-        .swagger-ui .prop-format, .swagger-ui .response-col_description__inner p { color: var(--soc-muted); }
-        .swagger-ui .scheme-container { background: var(--soc-panel); box-shadow: none; border-bottom: 1px solid var(--soc-border); }
-        .swagger-ui .opblock-tag { border-bottom: 1px solid var(--soc-border); }
-        .swagger-ui .opblock { background: var(--soc-panel); border-color: var(--soc-border); box-shadow: none; }
-        .swagger-ui .opblock .opblock-section-header { background: var(--soc-panel-2); box-shadow: none; }
-        .swagger-ui .opblock .opblock-summary { border-color: var(--soc-border); }
-        .swagger-ui section.models, .swagger-ui section.models .model-container { background: var(--soc-panel); border-color: var(--soc-border); }
-        .swagger-ui .model-box { background: var(--soc-panel-2); }
-        .swagger-ui .prop-type { color: var(--soc-accent); }
-        .swagger-ui input[type=text], .swagger-ui input[type=password], .swagger-ui input[type=email],
-        .swagger-ui input[type=file], .swagger-ui textarea, .swagger-ui select {
+        body.theme-dark .swagger-ui .info .description, body.theme-dark .swagger-ui .parameter__extension,
+        body.theme-dark .swagger-ui .prop-format, body.theme-dark .swagger-ui .response-col_description__inner p { color: var(--soc-muted); }
+        body.theme-dark .swagger-ui .scheme-container { background: var(--soc-panel); box-shadow: none; border-bottom: 1px solid var(--soc-border); }
+        body.theme-dark .swagger-ui .opblock-tag { border-bottom: 1px solid var(--soc-border); }
+        body.theme-dark .swagger-ui .opblock { background: var(--soc-panel); border-color: var(--soc-border); box-shadow: none; }
+        body.theme-dark .swagger-ui .opblock .opblock-section-header { background: var(--soc-panel-2); box-shadow: none; }
+        body.theme-dark .swagger-ui .opblock .opblock-summary { border-color: var(--soc-border); }
+        body.theme-dark .swagger-ui section.models, body.theme-dark .swagger-ui section.models .model-container { background: var(--soc-panel); border-color: var(--soc-border); }
+        body.theme-dark .swagger-ui .model-box { background: var(--soc-panel-2); }
+        body.theme-dark .swagger-ui .prop-type { color: var(--soc-accent); }
+        body.theme-dark .swagger-ui input[type=text], body.theme-dark .swagger-ui input[type=password], body.theme-dark .swagger-ui input[type=email],
+        body.theme-dark .swagger-ui input[type=file], body.theme-dark .swagger-ui textarea, body.theme-dark .swagger-ui select {
             background: var(--soc-panel-2); color: var(--soc-text); border: 1px solid var(--soc-border);
         }
-        .swagger-ui .dialog-ux .modal-ux { background: var(--soc-panel); border: 1px solid var(--soc-border); }
-        .swagger-ui .dialog-ux .modal-ux-header { border-bottom: 1px solid var(--soc-border); }
-        .swagger-ui .btn { color: var(--soc-text); border-color: var(--soc-border); }
-        .swagger-ui .btn.authorize { color: var(--soc-accent); border-color: var(--soc-accent); }
-        .swagger-ui .btn.authorize svg { fill: var(--soc-accent); }
-        .swagger-ui .copy-to-clipboard { background: var(--soc-panel-2); }
-        .swagger-ui .responses-table .response-col_description .markdown p { color: var(--soc-muted); }
-        .swagger-ui .filter .operation-filter-input { background: var(--soc-panel-2); border-color: var(--soc-border); }
-        .swagger-ui .opblock .opblock-summary-path, .swagger-ui .opblock .opblock-summary-path__deprecated { color: var(--soc-text); }
+        body.theme-dark .swagger-ui .dialog-ux .modal-ux { background: var(--soc-panel); border: 1px solid var(--soc-border); }
+        body.theme-dark .swagger-ui .dialog-ux .modal-ux-header { border-bottom: 1px solid var(--soc-border); }
+        body.theme-dark .swagger-ui .btn { color: var(--soc-text); border-color: var(--soc-border); }
+        body.theme-dark .swagger-ui .btn.authorize { color: var(--soc-accent); border-color: var(--soc-accent); }
+        body.theme-dark .swagger-ui .btn.authorize svg { fill: var(--soc-accent); }
+        body.theme-dark .swagger-ui .copy-to-clipboard { background: var(--soc-panel-2); }
+        body.theme-dark .swagger-ui .responses-table .response-col_description .markdown p { color: var(--soc-muted); }
+        body.theme-dark .swagger-ui .filter .operation-filter-input { background: var(--soc-panel-2); border-color: var(--soc-border); }
+        body.theme-dark .swagger-ui .opblock .opblock-summary-path, body.theme-dark .swagger-ui .opblock .opblock-summary-path__deprecated { color: var(--soc-text); }
+        body.theme-dark .swagger-ui .expand-methods svg, body.theme-dark .swagger-ui .expand-operation svg,
+        body.theme-dark .swagger-ui .model-toggle:after, body.theme-dark .swagger-ui .arrow { filter: invert(80%); }
+        body.theme-dark .swagger-ui .servers > label select { background: var(--soc-panel-2); color: var(--soc-text); }
+
+        /* HTTP method colours — shared by both themes for consistency */
         .swagger-ui .opblock.opblock-get .opblock-summary-method { background: #2f81f7; }
         .swagger-ui .opblock.opblock-post .opblock-summary-method { background: #2ea043; }
         .swagger-ui .opblock.opblock-put .opblock-summary-method { background: #d29922; }
         .swagger-ui .opblock.opblock-delete .opblock-summary-method { background: #f85149; }
-        .swagger-ui .expand-methods svg, .swagger-ui .expand-operation svg,
-        .swagger-ui .model-toggle:after, .swagger-ui .arrow { filter: invert(80%); }
-        .swagger-ui .servers > label select { background: var(--soc-panel-2); color: var(--soc-text); }
     </style>
 </head>
 <body>
     <div class="soc-header">
-        <img src="/images/yazamco-logo-on-dark.png" alt="Yazamco pro Cyber">
+        <img class="logo-dark" src="/images/yazamco-logo-on-dark.png" alt="Yazamco pro Cyber">
+        <img class="logo-light" src="/images/yazamco-logo.png" alt="Yazamco pro Cyber">
         <span class="title">Gophish API Documentation</span>
         <span class="badge">Live · This Instance</span>
+        <span class="spacer"></span>
+        <button type="button" class="theme-toggle" id="themeToggle" aria-label="Toggle day / night theme">
+            <span class="icon label-light">☀️</span><span class="label-light">Day mode</span>
+            <span class="icon label-dark">🌙</span><span class="label-dark">Night mode</span>
+        </button>
     </div>
     <div id="swagger-ui"></div>
     <script src="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui-bundle.js"
             integrity="sha384-wmyclcVGX/WhUkdkATwhaK1X1JtiNrr2EoYJ+diV3vj4v6OC5yCeSu+yW13SYJep" crossorigin="anonymous"></script>
     <script>
+        // ---- Theme handling (persisted in localStorage) ----
+        // Default to dark (SOC console) when nothing is stored.
+        (function () {
+            var stored = null;
+            try { stored = localStorage.getItem("gophish-docs-theme"); } catch (e) {}
+            if (stored !== "light") {
+                document.body.classList.add("theme-dark");
+            }
+        })();
+
         window.onload = function () {
             window.ui = SwaggerUIBundle({
                 url: "/docs/swagger.json",
@@ -105,6 +173,12 @@
                 persistAuthorization: true,
                 presets: [SwaggerUIBundle.presets.apis],
                 validatorUrl: null
+            });
+
+            var toggle = document.getElementById("themeToggle");
+            toggle.addEventListener("click", function () {
+                var isDark = document.body.classList.toggle("theme-dark");
+                try { localStorage.setItem("gophish-docs-theme", isDark ? "dark" : "light"); } catch (e) {}
             });
         };
     </script>
