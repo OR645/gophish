@@ -117,9 +117,14 @@ function fetchImageAsDataURL(url) {
         })
 }
 
-// waitForDocumentReady - resolves once every image in the document has finished
-// loading (or errored) and web fonts are ready, plus a short settle delay so the
-// final layout is stable. Capped so a slow remote asset can't hang the capture.
+// waitForDocumentReady - resolves once every image AND external stylesheet in
+// the document has finished loading (or errored) and web fonts are ready, plus a
+// short settle delay so the final layout is stable. Capped so a slow remote
+// asset can't hang the capture.
+//
+// Waiting for <link> stylesheets matters most for landing pages: they are
+// usually cloned from a real site and depend on an external CSS file, so
+// capturing before it applies produces a blank / unstyled frame.
 function waitForDocumentReady(doc) {
     return new Promise(function (resolve) {
         var settled = false
@@ -128,22 +133,30 @@ function waitForDocumentReady(doc) {
             settled = true
             var fontsReady = (doc.fonts && doc.fonts.ready) ? doc.fonts.ready : Promise.resolve()
             fontsReady.catch(function () {}).then(function () {
-                // One more tick so reflow from fonts/images is painted.
-                setTimeout(resolve, 350)
+                // One more tick so reflow from late CSS / fonts / images is painted.
+                setTimeout(resolve, 500)
             })
         }
         var imgs = Array.prototype.slice.call(doc.images || [])
-        var pending = imgs.filter(function (im) { return !im.complete })
+        var pendingImgs = imgs.filter(function (im) { return !im.complete })
+        // link.sheet is populated only once the stylesheet has loaded & parsed
+        // (works for cross-origin links too - reading .sheet is allowed, only
+        // .cssRules is blocked).
+        var links = Array.prototype.slice.call(doc.querySelectorAll('link[rel~="stylesheet"]'))
+        var pendingLinks = links.filter(function (l) {
+            try { return !l.sheet } catch (e) { return false }
+        })
+        var pending = pendingImgs.concat(pendingLinks)
         if (!pending.length) { settle(); return }
         var remaining = pending.length
-        var cap = setTimeout(settle, 6000) // don't wait forever on a stuck asset
+        var cap = setTimeout(settle, 10000) // don't wait forever on a stuck asset
         var onDone = function () {
             remaining--
             if (remaining <= 0) { clearTimeout(cap); settle() }
         }
-        pending.forEach(function (im) {
-            im.addEventListener("load", onDone)
-            im.addEventListener("error", onDone)
+        pending.forEach(function (el) {
+            el.addEventListener("load", onDone)
+            el.addEventListener("error", onDone)
         })
     })
 }
