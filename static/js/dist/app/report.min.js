@@ -211,10 +211,10 @@ function proxifyImagesForCapture(doc) {
 }
 
 // captureHtmlToImage - renders an HTML string off-screen and rasterizes it to a
-// PNG data URI with html2canvas (sharp). Used only when no external renderer is
-// configured (window.REPORT_SHOT.imageBase) - see captureCampaignAssets.
-// Resolves to null (never rejects) on failure - any failure is logged to the
-// console under the "[report]" prefix so it can be diagnosed.
+// PNG data URI with html2canvas (sharp). Used when no render webhook is
+// configured (REPORT_SHOT_WEBHOOK), or as the fallback when it fails - see
+// captureOne. Resolves to null (never rejects) on failure - any failure is
+// logged to the console under the "[report]" prefix so it can be diagnosed.
 //
 // Remote images without CORS headers are simply omitted by html2canvas (the
 // canvas stays clean and toDataURL still works), so they degrade gracefully and
@@ -344,26 +344,60 @@ function captureHtmlToImage(html, width) {
     })
 }
 
-// shotImageUrl - URL of a pre-rendered screenshot for a page/email, produced by
-// the external renderer at save time (see reportShotNotify in gophish.js).
-function shotImageUrl(base, kind, id) {
-    return base.replace(/\/+$/, "") + "/" + kind + "-" + id + ".png"
+// Optional render webhook (e.g. an n8n webhook). When set, the report POSTs the
+// email / landing-page HTML to it and the webhook RESPONDS with the rendered PNG
+// (a real headless browser = faithful fonts/layout/text). Nothing is stored:
+// rendering happens on demand at report time, so no extra service or image host
+// is needed - just n8n. Leave blank to render with html2canvas in the browser.
+// See deploy/report-screenshots-n8n.md.
+var REPORT_SHOT_WEBHOOK = "https://n8n.yazamco.pro/webhook/gophish-screenshot" // blank to disable
+
+// captureViaWebhook - POSTs the HTML to the render webhook and returns the PNG
+// as a data URI (so the report stays self-contained). Resolves to null on any
+// failure so the caller can fall back to html2canvas.
+function captureViaWebhook(html, width) {
+    return fetch(REPORT_SHOT_WEBHOOK, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ html: html, width: width })
+    }).then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status)
+        return r.blob()
+    }).then(function (blob) {
+        // Accept image/* or an untyped/octet-stream binary; reject obvious
+        // non-images (an n8n error is usually text/* or application/json).
+        if (!blob || blob.size === 0) throw new Error("empty response")
+        if (blob.type && /^(text\/|application\/json)/i.test(blob.type)) {
+            throw new Error("response was not an image (" + blob.type + ")")
+        }
+        return new Promise(function (resolve, reject) {
+            var fr = new FileReader()
+            fr.onload = function () { resolve(fr.result) }
+            fr.onerror = reject
+            fr.readAsDataURL(blob)
+        })
+    }).catch(function (e) {
+        if (window.console) console.warn("[report] render webhook failed, falling back to html2canvas:", e)
+        return null
+    })
 }
 
-// captureCampaignAssets - returns {emailImg, pageImg} for the report. When a
-// render webhook is configured (window.REPORT_SHOT.imageBase), it just points at
-// the pre-rendered PNGs (no in-browser rasterizing); otherwise it screenshots
-// the email body and landing page with the headless service / html2canvas.
-function captureCampaignAssets(campaign) {
-    var cfg = window.REPORT_SHOT || {}
-    if (cfg.imageBase) {
-        var t = campaign.template || {}
-        var p = campaign.page || {}
-        return Promise.resolve({
-            emailImg: t.id ? shotImageUrl(cfg.imageBase, "email", t.id) : null,
-            pageImg: p.id ? shotImageUrl(cfg.imageBase, "page", p.id) : null
+// captureOne - render a single asset to a PNG data URI: the webhook (faithful)
+// when configured, otherwise html2canvas. Falls back to html2canvas if the
+// webhook errors.
+function captureOne(html, width) {
+    if (!html) return Promise.resolve(null)
+    if (REPORT_SHOT_WEBHOOK) {
+        return captureViaWebhook(html, width).then(function (img) {
+            return img || captureHtmlToImage(html, width)
         })
     }
+    return captureHtmlToImage(html, width)
+}
+
+// captureCampaignAssets - returns {emailImg, pageImg} PNG data URIs for the
+// report (rendered via the webhook or html2canvas).
+function captureCampaignAssets(campaign) {
     var recipient = reportSortByRisk(campaign.results)[0] || {}
     var tmpl = campaign.template || {}
     var emailHtml = tmpl.html
@@ -373,10 +407,10 @@ function captureCampaignAssets(campaign) {
             : "")
     var pageHtml = renderGophishTemplate((campaign.page || {}).html || "", campaign, recipient)
     return Promise.all([
-        emailHtml ? captureHtmlToImage(emailHtml, 800) : Promise.resolve(null),
-        // Landing pages are usually built for a desktop viewport - capture at a
+        captureOne(emailHtml, 800),
+        // Landing pages are usually built for a desktop viewport - render at a
         // realistic desktop width so the layout matches what the victim saw.
-        pageHtml ? captureHtmlToImage(pageHtml, 1280) : Promise.resolve(null)
+        captureOne(pageHtml, 1280)
     ]).then(function (imgs) {
         return { emailImg: imgs[0], pageImg: imgs[1] }
     })
@@ -458,20 +492,11 @@ function buildPreviewIframe(html, isHtml, emptyMsg) {
     return '<iframe class="preview-frame" style="pointer-events:none;" sandbox srcdoc="' + reportAttrEscape(doc) + '"></iframe>'
 }
 
-// screenshotOrFallback - prefers a captured/pre-rendered PNG; falls back to a
-// sandboxed iframe preview, then to an empty-state message. When the PNG is a
-// remote URL (the externally-rendered screenshot) that fails to load, an inline
-// onerror swaps in the iframe preview so the report still shows the page.
-function screenshotOrFallback(imgUrl, html, isHtml, emptyMsg, altText) {
-    if (imgUrl) {
-        var fallback = buildPreviewIframe(html, isHtml, emptyMsg)
-        return '<div class="shot-wrap">' +
-            '<div class="screenshot"><img src="' + imgUrl + '" alt="' + altText + '" ' +
-            'onerror="this.parentNode.style.display=\'none\';' +
-            'this.parentNode.parentNode.querySelector(\'.shot-fallback\').style.display=\'block\'">' +
-            '</div>' +
-            '<div class="shot-fallback" style="display:none">' + fallback + '</div>' +
-            '</div>'
+// screenshotOrFallback - prefers a captured PNG screenshot; falls back to a
+// sandboxed iframe preview, then to an empty-state message.
+function screenshotOrFallback(imgDataUrl, html, isHtml, emptyMsg, altText) {
+    if (imgDataUrl) {
+        return '<div class="screenshot"><img src="' + imgDataUrl + '" alt="' + altText + '"></div>'
     }
     return buildPreviewIframe(html, isHtml, emptyMsg)
 }

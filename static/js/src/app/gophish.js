@@ -35,36 +35,6 @@ function modalError(message) {
         <i class=\"fa fa-exclamation-circle\"></i> " + message + "</div>")
 }
 
-// ---- Campaign-report screenshots (optional, no extra service) --------------
-// When a landing page / email template is saved, its HTML can be pushed to an
-// external renderer (e.g. an n8n webhook) that turns it into a PNG. The campaign
-// report then just shows that PNG. Nothing runs inside gophish.
-//   webhook   - POST target; receives {type:'page'|'email', id, name, html} on save
-//   imageBase - where the renderer stores the PNGs; the report loads
-//               <imageBase>/page-<id>.png and <imageBase>/email-<id>.png
-// Leave both blank to disable (the report falls back to html2canvas).
-// See deploy/report-screenshots-n8n.md.
-window.REPORT_SHOT = {
-    webhook: "",
-    imageBase: ""
-}
-
-// reportShotNotify - fire-and-forget POST of saved HTML to the render webhook.
-// Never blocks or fails the save. `saved` must carry id, name and html.
-function reportShotNotify(type, saved) {
-    var cfg = window.REPORT_SHOT || {}
-    if (!cfg.webhook || !saved || !saved.id) return
-    try {
-        fetch(cfg.webhook, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            keepalive: true, // survive the modal closing / navigation
-            body: JSON.stringify({ type: type, id: saved.id, name: saved.name, html: saved.html })
-        }).catch(function () {})
-    } catch (e) { /* never block the save */ }
-}
-window.reportShotNotify = reportShotNotify
-
 function query(endpoint, method, data, async) {
     return $.ajax({
         url: "/api" + endpoint,

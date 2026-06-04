@@ -48,7 +48,6 @@ function save(idx) {
         template.id = templates[idx].id
         api.templateId.put(template)
             .success(function (data) {
-                reportShotNotify("email", { id: template.id, name: template.name, html: template.html })
                 successFlash("Template edited successfully!")
                 load()
                 dismiss()
@@ -60,7 +59,6 @@ function save(idx) {
         // Submit the template
         api.templates.post(template)
             .success(function (data) {
-                reportShotNotify("email", { id: data.id, name: template.name, html: template.html })
                 successFlash("Template added successfully!")
                 load()
                 dismiss()

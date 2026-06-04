@@ -19,7 +19,6 @@ function save(idx) {
         page.id = pages[idx].id
         api.pageId.put(page)
             .success(function (data) {
-                reportShotNotify("page", { id: page.id, name: page.name, html: page.html })
                 successFlash("Page edited successfully!")
                 load()
                 dismiss()
@@ -28,7 +27,6 @@ function save(idx) {
         // Submit the page
         api.pages.post(page)
             .success(function (data) {
-                reportShotNotify("page", { id: data.id, name: page.name, html: page.html })
                 successFlash("Page added successfully!")
                 load()
                 dismiss()
