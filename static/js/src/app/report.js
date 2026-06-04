@@ -210,15 +210,71 @@ function proxifyImagesForCapture(doc) {
     return changed
 }
 
-// captureHtmlToImage - renders an HTML string off-screen and rasterizes it to a
-// PNG data URI with html2canvas (sharp), producing a real screenshot-style
+// Self-hosted headless-browser screenshot service (browserless v2). When
+// REPORT_SHOT_ENDPOINT is set, the email / landing-page HTML is rendered by a
+// REAL Chrome into a faithful, full-page PNG - fonts, layout, text and complex
+// cloned pages all come out correct, which html2canvas can't guarantee. The
+// rendered HTML stays inside your own infrastructure (no third-party service).
+// Leave REPORT_SHOT_ENDPOINT empty to disable and use html2canvas instead.
+// Setup: see deploy/headless-screenshot.md.
+var REPORT_SHOT_ENDPOINT = "" // e.g. "https://shot.yazamco.pro/screenshot"
+var REPORT_SHOT_TOKEN = ""    // browserless TOKEN (sent as ?token=)
+
+// captureViaHeadless - POSTs the HTML to the browserless screenshot endpoint and
+// returns the PNG as a data URI (so the report stays self-contained). Resolves
+// to null on any failure so the caller can fall back to html2canvas.
+function captureViaHeadless(html, width) {
+    var url = REPORT_SHOT_ENDPOINT + (REPORT_SHOT_TOKEN ? ("?token=" + encodeURIComponent(REPORT_SHOT_TOKEN)) : "")
+    var body = {
+        html: html,
+        // fullPage lets Chrome measure the real content height itself - no
+        // manual height math and nothing gets truncated.
+        options: { type: "png", fullPage: true },
+        viewport: { width: width, height: 900, deviceScaleFactor: 2 },
+        gotoOptions: { waitUntil: "networkidle2", timeout: 30000 },
+        waitForTimeout: 1500 // settle time for late images/fonts
+    }
+    return fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+    }).then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status)
+        return r.blob()
+    }).then(function (blob) {
+        return new Promise(function (resolve, reject) {
+            var fr = new FileReader()
+            fr.onload = function () { resolve(fr.result) }
+            fr.onerror = reject
+            fr.readAsDataURL(blob)
+        })
+    }).catch(function (e) {
+        if (window.console) console.warn("[report] headless screenshot failed, falling back to html2canvas:", e)
+        return null
+    })
+}
+
+// captureHtmlToImage - returns a PNG data URI for an HTML string. Prefers the
+// headless-browser service (faithful render) when configured, and falls back to
+// html2canvas otherwise. Resolves to null (never rejects) on failure.
+function captureHtmlToImage(html, width) {
+    if (REPORT_SHOT_ENDPOINT) {
+        return captureViaHeadless(html, width).then(function (img) {
+            return img || captureViaHtml2Canvas(html, width)
+        })
+    }
+    return captureViaHtml2Canvas(html, width)
+}
+
+// captureViaHtml2Canvas - renders an HTML string off-screen and rasterizes it to
+// a PNG data URI with html2canvas (sharp), producing a real screenshot-style
 // image. Resolves to null (never rejects) on failure - any failure is logged to
 // the console under the "[report]" prefix so it can be diagnosed.
 //
 // Remote images without CORS headers are simply omitted by html2canvas (the
 // canvas stays clean and toDataURL still works), so they degrade gracefully and
 // are not a capture failure - any real failure is surfaced in the console.
-function captureHtmlToImage(html, width) {
+function captureViaHtml2Canvas(html, width) {
     if (typeof window.html2canvas !== "function") {
         if (window.console) console.warn("[report] html2canvas not loaded - cannot capture screenshot, using inline fallback")
         return Promise.resolve(null)

@@ -29,9 +29,11 @@
                 <img class="for-dark" src="/images/yazamco-logo-on-dark.png" alt="Yazamco pro Cyber">
                 <img class="for-light" src="/images/yazamco-logo.png" alt="Yazamco pro Cyber">
             </a>
-            <div class="lead">
-                <div class="eyebrow">// OPEN-SOURCE PHISHING FRAMEWORK</div>
-                <p>Campaign console for Gophish &mdash; design, send and track phishing simulations.</p>
+            <div class="login-hero">
+                <div class="login-hexagon"><img src="/images/YazamcoGophish.png" alt="Gophish by Yazamco"></div>
+                <div class="eyebrow">// PHISHING SIMULATION PLATFORM</div>
+                <h1 class="login-hero-title">Gophish&nbsp;Console</h1>
+                <p>Design, launch and track phishing simulations across your organization.</p>
             </div>
             <div class="brand-credit">
                 <img src="/images/gophish-logo.png" alt="Gophish">
@@ -44,22 +46,15 @@
                 <p class="subtitle">Access the campaign console</p>
                 {{template "flashes" .Flashes}}
                 {{if .SSOEnabled}}
-                <a class="btn btn-lg btn-primary btn-block" style="display:flex;align-items:center;justify-content:center;gap:10px;text-decoration:none;" href="/auth/login{{if .Next}}?next={{.Next}}{{end}}">
-                    <svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true">
-                        <rect x="0" y="0" width="10" height="10" fill="#f25022"/>
-                        <rect x="11" y="0" width="10" height="10" fill="#7fba00"/>
-                        <rect x="0" y="11" width="10" height="10" fill="#00a4ef"/>
-                        <rect x="11" y="11" width="10" height="10" fill="#ffb900"/>
+                <a class="btn-sso" href="/auth/login{{if .Next}}?next={{.Next}}{{end}}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                     </svg>
-                    Sign in with Microsoft
+                    Continue with Microsoft Entra ID
                 </a>
                 {{end}}
                 {{if and .SSOEnabled .PasswordLogin}}
-                <div style="display:flex;align-items:center;gap:10px;margin:16px 0;color:var(--ink-faint);font-size:11px;">
-                    <span style="flex:1;height:1px;background:currentColor;opacity:.3;"></span>
-                    OR
-                    <span style="flex:1;height:1px;background:currentColor;opacity:.3;"></span>
-                </div>
+                <div class="or-sep">or sign in with credentials</div>
                 {{end}}
                 {{if .PasswordLogin}}
                 <form class="form-signin" action="" method="POST">
@@ -72,12 +67,17 @@
                         <input type="password" id="password" name="password" class="form-control" placeholder="Password" autocomplete="off" required>
                     </div>
                     <input type="hidden" name="csrf_token" value="{{.Token}}" />
-                    <button class="btn btn-lg btn-{{if .SSOEnabled}}default{{else}}primary{{end}} btn-block" type="submit">Sign in to console</button>
+                    <button class="btn btn-lg btn-{{if .SSOEnabled}}default{{else}}primary{{end}} btn-block" type="submit">Sign in to console <i class="fa fa-chevron-right" style="font-size:11px;"></i></button>
                 </form>
                 {{end}}
-                <div class="row" style="justify-content:center;display:flex;gap:8px;color:var(--ink-faint);font-size:12px;margin-top:16px;">
-                    <i class="fa fa-shield"></i> Protected by your organization's policy
+                {{if and .SSOEnabled (not .PasswordLogin)}}
+                <div class="sso-note">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M5 11h14v10H5zM8 11V7a4 4 0 018 0v4" />
+                    </svg>
+                    <span>Username &amp; password sign-in is <b>disabled by your administrator</b>. Continue with Single Sign-On above.</span>
                 </div>
+                {{end}}
             </div>
         </div>
     </div>
