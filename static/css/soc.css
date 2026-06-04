@@ -1174,3 +1174,13 @@ textarea.form-control, textarea.input, .modal textarea.form-control {
 .prov-row .pr-l span { font-size: 11px; color: var(--ink-dim); font-family: var(--mono-font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .rec-type { display: inline-flex; align-items: center; font-family: var(--mono-font); font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; letter-spacing: 0.4px; }
+
+/* ---- Hudu company picker (Companies modal) ---- */
+.hudu-results { position: absolute; left: 0; right: 0; top: 100%; z-index: 30; margin-top: 4px; max-height: 240px; overflow-y: auto; background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: 0 12px 28px rgb(0 0 0 / 0.35); }
+.hudu-results .hudu-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer; border-bottom: 1px solid var(--border-soft, var(--border)); }
+.hudu-results .hudu-item:last-child { border-bottom: none; }
+.hudu-results .hudu-item:hover, .hudu-results .hudu-item.active { background: var(--hover); }
+.hudu-results .hudu-item .hn { color: var(--ink); font-size: 13px; font-weight: 600; flex-shrink: 0; }
+.hudu-results .hudu-item .hh { color: var(--ink-mid); font-size: 12.5px; direction: rtl; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; text-align: left; }
+.hudu-results .hudu-item .hc { color: var(--ink-dim); font-size: 11px; font-family: var(--mono-font); flex-shrink: 0; }
+.hudu-results .hudu-empty { padding: 10px 12px; color: var(--ink-dim); font-size: 12.5px; }

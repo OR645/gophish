@@ -18,6 +18,8 @@
 	"contact_address": "",
 	"n8n_webhook_url": "",
 	"n8n_webhook_secret": "",
+	"hudu_companies_url": "",
+	"hudu_companies_secret": "",
 	"logging": {
 		"filename": "",
 		"level": ""

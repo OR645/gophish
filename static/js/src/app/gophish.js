@@ -158,6 +158,10 @@ var api = {
         // post() - Posts a company to POST /companies
         post: function (company) {
             return query("/companies/", "POST", company, false)
+        },
+        // hudu() - Queries the API for GET /companies/hudu (companies known in Hudu)
+        hudu: function () {
+            return query("/companies/hudu", "GET", {}, false)
         }
     },
     // companyId contains the endpoints for /companies/:id

@@ -1348,8 +1348,33 @@ function openReportWindow(html) {
     setTimeout(function () { URL.revokeObjectURL(url) }, 60000)
 }
 
+// generateAndOpenReport - shows a loading dialog, loads the logo (data URI ->
+// self-contained) and captures the email + landing-page screenshots in
+// parallel, then builds & opens the report; builds regardless of failures.
+function generateAndOpenReport(campaign, companyName) {
+    Swal.fire({
+        title: "Generating Report",
+        html: "Capturing screenshots, please wait…",
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        onOpen: function () { Swal.showLoading() }
+    })
+    Promise.all([
+        fetchImageAsDataURL("/images/yazamco-logo.png").catch(function () { return null }),
+        captureCampaignAssets(campaign)
+    ]).then(function (res) {
+        Swal.close()
+        openReportWindow(buildPhishingReportHTML(campaign, companyName, res[0], res[1]))
+    }).catch(function () {
+        Swal.close()
+        openReportWindow(buildPhishingReportHTML(campaign, companyName, null, {}))
+    })
+}
+
 // promptCompanyAndOpen - asks for the company name (themed to match the SOC
-// console UI), loads the logo, then builds & opens the report.
+// console UI), then builds & opens the report. Only used as the fallback when
+// the campaign has no company assigned (otherwise the company's Hebrew name is
+// used automatically - see openCampaignReport).
 function promptCompanyAndOpen(campaign) {
     Swal.fire({
         title: "Generate Report",
@@ -1373,37 +1398,34 @@ function promptCompanyAndOpen(campaign) {
         }
     }).then(function (result) {
         if (!result.value) return
-        var companyName = result.value
-        // Show a loading dialog while we capture screenshots (can take a moment).
-        Swal.fire({
-            title: "Generating Report",
-            html: "Capturing screenshots, please wait…",
-            allowOutsideClick: false,
-            allowEscapeKey: false,
-            onOpen: function () { Swal.showLoading() }
-        })
-        // Load the logo (data URI -> self-contained) and capture the email +
-        // landing-page screenshots in parallel; build regardless of failures.
-        Promise.all([
-            fetchImageAsDataURL("/images/yazamco-logo.png").catch(function () { return null }),
-            captureCampaignAssets(campaign)
-        ]).then(function (res) {
-            Swal.close()
-            openReportWindow(buildPhishingReportHTML(campaign, companyName, res[0], res[1]))
-        }).catch(function () {
-            Swal.close()
-            openReportWindow(buildPhishingReportHTML(campaign, companyName, null, {}))
-        })
+        generateAndOpenReport(campaign, result.value)
     })
 }
 
 // openCampaignReport - entry point used from both the campaigns list and the
-// campaign results page. Fetches the full campaign (url + results + timeline),
-// then prompts for the company name and opens the report.
+// campaign results page. Fetches the full campaign (url + results + timeline).
+// When the campaign is linked to a company, the company's Hebrew name (falling
+// back to its English name) is used directly - no prompt. Otherwise the user
+// is asked for the company name as before.
 function openCampaignReport(campaignId) {
     api.campaignId.get(campaignId)
         .success(function (c) {
-            promptCompanyAndOpen(c)
+            if (c.company_id) {
+                api.companyId.get(c.company_id)
+                    .success(function (company) {
+                        var name = (company && (company.name_he || company.name)) || ""
+                        if (name) {
+                            generateAndOpenReport(c, name)
+                        } else {
+                            promptCompanyAndOpen(c)
+                        }
+                    })
+                    .error(function () {
+                        promptCompanyAndOpen(c)
+                    })
+            } else {
+                promptCompanyAndOpen(c)
+            }
         })
         .error(function () {
             if (typeof errorFlash === "function") {

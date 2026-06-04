@@ -21,6 +21,8 @@
             <thead>
                 <tr>
                     <th>Company</th>
+                    <th>Hebrew Name</th>
+                    <th>Customer ID</th>
                     <th>Campaigns</th>
                     <th>Last Modified</th>
                     <th class="no-sort"></th>
@@ -48,9 +50,23 @@
             <div class="cx-body">
                 <div class="cx-main" id="modal_body">
                     <div id="modal.flashes" style="margin-bottom:14px;"></div>
+                    <div class="field" id="hudu_picker" style="position:relative;">
+                        <label for="hudu_search">Add from Hudu</label>
+                        <input type="text" class="form-control" placeholder="Search Hudu companies…" id="hudu_search" autocomplete="off" autofocus />
+                        <div id="hudu_results" class="hudu-results" style="display:none;"></div>
+                        <p class="cx-sub" id="hudu_status" style="margin:6px 0 0;"></p>
+                    </div>
                     <div class="field">
                         <label for="name">Company name</label>
-                        <input type="text" class="form-control" placeholder="e.g. Acme Corporation" id="name" required autofocus />
+                        <input type="text" class="form-control" placeholder="e.g. Acme Corporation" id="name" required />
+                    </div>
+                    <div class="field">
+                        <label for="name_he">Hebrew name <span style="font-weight:400;opacity:.7;">(shown on reports)</span></label>
+                        <input type="text" class="form-control" placeholder="לדוגמה: אקמי בע&quot;מ" id="name_he" dir="rtl" />
+                    </div>
+                    <div class="field">
+                        <label for="customer_id">Customer ID</label>
+                        <input type="text" class="form-control" placeholder="e.g. 8099803" id="customer_id" />
                     </div>
                 </div>
             </div>

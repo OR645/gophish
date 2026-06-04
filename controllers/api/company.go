@@ -49,6 +49,22 @@ func (as *Server) Companies(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// CompaniesHudu proxies the n8n hudu-companies webhook, returning the list of
+// (non-archived) companies known in Hudu so the UI can offer them in the
+// "New Company" picker. The webhook secret stays server-side.
+func (as *Server) CompaniesHudu(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		JSONResponse(w, models.Response{Success: false, Message: "Method not allowed"}, http.StatusMethodNotAllowed)
+		return
+	}
+	cs, err := models.GetHuduCompanies()
+	if err != nil {
+		JSONResponse(w, models.Response{Success: false, Message: "Error fetching companies from Hudu"}, http.StatusBadGateway)
+		return
+	}
+	JSONResponse(w, cs, http.StatusOK)
+}
+
 // Company returns details about the requested company.
 // If the company is not valid, Company returns null.
 func (as *Server) Company(w http.ResponseWriter, r *http.Request) {
