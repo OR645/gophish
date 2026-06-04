@@ -43,6 +43,18 @@ type SpamReportRecipient struct {
 	SendDate time.Time `json:"send_date"`
 }
 
+// SpamReportCompany is the company (organization) the campaign is associated
+// with, as it appears in gophish.
+type SpamReportCompany struct {
+	// Id is the company's gophish id.
+	Id int64 `json:"id"`
+	// Name is the English company name; NameHe is the Hebrew name.
+	Name   string `json:"name"`
+	NameHe string `json:"name_he"`
+	// CustomerId is the Hudu customer id.
+	CustomerId string `json:"customer_id"`
+}
+
 // SpamReportPayload is the body POSTed to the spam-report webhook.
 type SpamReportPayload struct {
 	CampaignId    int64                 `json:"campaign_id"`
@@ -50,6 +62,7 @@ type SpamReportPayload struct {
 	Status        string                `json:"status"`
 	LaunchDate    time.Time             `json:"launch_date"`
 	CompletedDate time.Time             `json:"completed_date"`
+	Company       *SpamReportCompany    `json:"company,omitempty"`
 	NumRecipients int                   `json:"num_recipients"`
 	Recipients    []SpamReportRecipient `json:"recipients"`
 }
@@ -72,7 +85,7 @@ func buildSpamReportPayload(c *Campaign) SpamReportPayload {
 			SendDate:     r.SendDate,
 		})
 	}
-	return SpamReportPayload{
+	payload := SpamReportPayload{
 		CampaignId:    c.Id,
 		CampaignName:  c.Name,
 		Status:        c.Status,
@@ -81,6 +94,23 @@ func buildSpamReportPayload(c *Campaign) SpamReportPayload {
 		NumRecipients: len(recipients),
 		Recipients:    recipients,
 	}
+	// Attach the company (organization) the campaign is associated with, if any,
+	// so the webhook receives its Hebrew/English name and ids.
+	if c.CompanyId != 0 {
+		company := Company{}
+		err := db.Where("id=?", c.CompanyId).Find(&company).Error
+		if err != nil {
+			log.Warnf("%s: company %d not found for spam report", err, c.CompanyId)
+		} else {
+			payload.Company = &SpamReportCompany{
+				Id:         company.Id,
+				Name:       company.Name,
+				NameHe:     company.NameHe,
+				CustomerId: company.CustomerId,
+			}
+		}
+	}
+	return payload
 }
 
 // SendSpamReportWebhook POSTs the campaign's per-recipient results to the n8n
