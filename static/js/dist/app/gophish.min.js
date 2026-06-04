@@ -104,6 +104,10 @@ var api = {
         complete: function (id) {
             return query("/campaigns/" + id + "/complete", "GET", {}, true)
         },
+        // reopen() - Reopens a completed campaign at GET /campaigns/:id/reopen
+        reopen: function (id) {
+            return query("/campaigns/" + id + "/reopen", "GET", {}, true)
+        },
         // summary() - Queries the API for GET /campaigns/summary
         summary: function (id) {
             return query("/campaigns/" + id + "/summary", "GET", {}, true)

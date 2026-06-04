@@ -137,6 +137,23 @@ func (as *Server) CampaignComplete(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// CampaignReopen reverts a completed campaign to "In progress" so events are
+// processed again. Emails that were dropped from the send queue when the
+// campaign was completed are not re-sent.
+func (as *Server) CampaignReopen(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, _ := strconv.ParseInt(vars["id"], 0, 64)
+	switch {
+	case r.Method == "GET":
+		err := models.ReopenCampaign(id, ctx.Get(r, "user_id").(int64))
+		if err != nil {
+			JSONResponse(w, models.Response{Success: false, Message: "Error reopening campaign"}, http.StatusInternalServerError)
+			return
+		}
+		JSONResponse(w, models.Response{Success: true, Message: "Campaign reopened successfully!"}, http.StatusOK)
+	}
+}
+
 // CampaignSpamReport fires the n8n spam-report webhook for a campaign. The
 // webhook is sent in the background (fire-and-forget): this handler returns as
 // soon as the request is queued without waiting for the webhook's response.

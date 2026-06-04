@@ -772,11 +772,44 @@ func CompleteCampaign(id int64, uid int64) error {
 	if c.Status == CampaignComplete {
 		return nil
 	}
-	// Mark the campaign as complete
+	// Mark the campaign as complete. Scope the update by the campaign's
+	// owner rather than the requesting user: GetCampaign above already
+	// authorized the request, and admins may complete campaigns they don't
+	// own (a user_id=uid filter would silently match zero rows for them).
 	c.CompletedDate = time.Now().UTC()
 	c.Status = CampaignComplete
-	err = db.Model(&Campaign{}).Where("id=? and user_id=?", id, uid).
+	err = db.Model(&Campaign{}).Where("id=? and user_id=?", id, c.UserId).
 		Select([]string{"completed_date", "status"}).UpdateColumns(&c).Error
+	if err != nil {
+		log.Error(err)
+	}
+	return err
+}
+
+// ReopenCampaign reverts a completed campaign to "In progress" so the
+// phishing server resumes recording events (opens, clicks, submissions) for
+// it. Maillogs deleted when the campaign was completed are NOT restored, so
+// emails that were still queued at that point are not sent — reopening only
+// resumes event processing.
+func ReopenCampaign(id int64, uid int64) error {
+	log.WithFields(logrus.Fields{
+		"campaign_id": id,
+	}).Info("Reopening campaign")
+	c, err := GetCampaign(id, uid)
+	if err != nil {
+		return err
+	}
+	if c.Status != CampaignComplete {
+		return nil
+	}
+	// Clear the completed date so completing the campaign again stamps a
+	// fresh time. As in CompleteCampaign, scope the update by the
+	// campaign's owner so admins can reopen campaigns they don't own.
+	err = db.Model(&Campaign{}).Where("id=? and user_id=?", id, c.UserId).
+		UpdateColumns(map[string]interface{}{
+			"status":         CampaignInProgress,
+			"completed_date": time.Time{},
+		}).Error
 	if err != nil {
 		log.Error(err)
 	}

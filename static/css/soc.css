@@ -380,6 +380,13 @@ table.dataTable thead .sorting:after, table.dataTable thead .sorting_asc:after, 
 .soc-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .soc-split { display: grid; grid-template-columns: 1.55fr 1fr; gap: 14px; }
 .soc-between { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+/* Panel whose body scrolls instead of growing: it contributes no height of
+   its own to a .soc-split/.soc-grid row, so the row height is driven entirely
+   by the sibling panel (e.g. Live Activity matches Phishing Funnel, Risk by
+   Campaign matches Engagement Over Time) and the content scrolls inside. */
+.panel-scroll { display: flex; flex-direction: column; }
+.panel-scroll .panel-body { flex: 1; min-height: 0; position: relative; padding: 0; }
+.panel-scroll .panel-body > .scroll-inner { position: absolute; inset: 0; overflow-y: auto; padding: var(--pad); }
 /* vertical layout helper from the reference design — spaces a page's sections */
 .stack { display: flex; flex-direction: column; gap: 14px; }
 .soc-section-title { font-size: 14px; font-weight: 600; color: var(--ink); margin: 2px 0; }
@@ -558,6 +565,9 @@ kbd { background: var(--panel-2) !important; color: var(--ink) !important; }
 @media (max-width: 980px) {
   .soc-split, .soc-grid-2, .soc-grid-3 { grid-template-columns: 1fr; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  /* Single-column layout: scroll panels no longer have a sibling to derive
+     their height from, so give the body a fixed height to scroll within. */
+  .panel-scroll .panel-body { min-height: 300px; }
 }
 
 /* panel head action area + sub */

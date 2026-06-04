@@ -175,11 +175,13 @@ function renderEngagement(cs) {
 }
 
 function renderRisk(cs) {
+    // All campaigns, highest risk first — the panel body scrolls (.panel-scroll)
+    // so the list doesn't stretch the Engagement Over Time panel next to it.
     var rows = cs.map(function (c) {
         var s = c.stats || {}
         var rate = s.total ? Math.round((s.submitted_data / s.total) * 100) : 0
         return { name: c.name, n: s.total || 0, rate: rate }
-    }).sort(function (a, b) { return b.rate - a.rate }).slice(0, 6)
+    }).sort(function (a, b) { return b.rate - a.rate })
     document.getElementById("riskList").innerHTML = rows.map(function (d) {
         var col = d.rate >= 30 ? "var(--c-submitted)" : d.rate >= 20 ? "var(--c-clicked)" : "var(--accent)"
         var txt = d.rate >= 30 ? "var(--c-submitted)" : d.rate >= 20 ? "var(--c-clicked)" : "var(--ink-mid)"
@@ -230,7 +232,9 @@ function renderFeed(events) {
         return
     }
     events.sort(function (a, b) { return new Date(b.time) - new Date(a.time) })
-    el.innerHTML = events.slice(0, 14).map(function (e) {
+    // The feed scrolls inside its panel (.panel-scroll, height matched to the
+    // Phishing Funnel panel), so we can afford a longer backlog.
+    el.innerHTML = events.slice(0, 40).map(function (e) {
         var meta = EVENT_META[e.message] || { c: "var(--ink-faint)", verb: e.message }
         var body
         if (e.email && meta.verb) body = '<b>' + escapeHtml(e.email) + '</b> ' + meta.verb

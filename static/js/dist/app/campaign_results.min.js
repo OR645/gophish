@@ -164,6 +164,13 @@ function deleteCampaign() {
     })
 }
 
+// toggleCompleteButtons swaps the Complete/Reopen buttons to match the
+// campaign status (completed -> offer Reopen, active -> offer Complete).
+function toggleCompleteButtons(completed) {
+    $('#complete_button').toggle(!completed)
+    $('#reopen_button').toggle(completed)
+}
+
 // Completes a campaign after prompting the user
 function completeCampaign() {
     Swal.fire({
@@ -195,9 +202,54 @@ function completeCampaign() {
                 'This campaign has been completed!',
                 'success'
             );
-            $('#complete_button')[0].disabled = true;
-            $('#complete_button').text('Completed!')
+            campaign.status = "Completed"
+            renderHeader(campaign)
+            toggleCompleteButtons(true)
             doPoll = false;
+        }
+    })
+}
+
+// Reopens a completed campaign after prompting the user. Completing a
+// campaign deletes any still-queued maillogs, so reopening resumes event
+// processing (opens/clicks/submissions) but does not resend unsent emails.
+function reopenCampaign() {
+    Swal.fire({
+        title: "Reopen this campaign?",
+        text: "Gophish will resume processing events for this campaign. Emails that were still queued when it was completed will not be re-sent.",
+        type: "question",
+        animation: false,
+        showCancelButton: true,
+        confirmButtonText: "Reopen Campaign",
+        confirmButtonColor: "#428bca",
+        reverseButtons: true,
+        allowOutsideClick: false,
+        showLoaderOnConfirm: true,
+        preConfirm: function () {
+            return new Promise(function (resolve, reject) {
+                api.campaignId.reopen(campaign.id)
+                    .success(function (msg) {
+                        resolve()
+                    })
+                    .error(function (data) {
+                        reject(data.responseJSON.message)
+                    })
+            })
+        }
+    }).then(function (result) {
+        if (result.value) {
+            Swal.fire(
+                'Campaign Reopened!',
+                'This campaign is active again.',
+                'success'
+            );
+            campaign.status = "In progress"
+            renderHeader(campaign)
+            toggleCompleteButtons(false)
+            // Resume the periodic refresh that was stopped on completion.
+            doPoll = true;
+            clearTimeout(setRefresh)
+            setRefresh = setTimeout(refresh, 60000)
         }
     })
 }
@@ -777,9 +829,8 @@ function load() {
                 $("#campaignResults").show()
                 // Set the title, meta line and status pill
                 renderHeader(c)
+                toggleCompleteButtons(c.status == "Completed")
                 if (c.status == "Completed") {
-                    $('#complete_button')[0].disabled = true;
-                    $('#complete_button').text('Completed!');
                     doPoll = false;
                 }
                 // Setup viewing the details of a result

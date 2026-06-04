@@ -186,6 +186,19 @@
         }
       }
     },
+    "/campaigns/{id}/reopen": {
+      "parameters": [ { "$ref": "#/components/parameters/CampaignId" } ],
+      "get": {
+        "tags": ["Campaigns"],
+        "summary": "Reopen a completed campaign",
+        "description": "Reverts a **Completed** campaign back to **In progress** so the phishing server resumes recording events (opens, clicks, submissions). Emails that were still queued when the campaign was completed are **not** re-sent. No-op if the campaign is not completed. (Note: this is a GET request for consistency with `/complete`.)",
+        "operationId": "reopenCampaign",
+        "responses": {
+          "200": { "$ref": "#/components/responses/GenericSuccess" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
     "/campaigns/{id}/results/resend": {
       "parameters": [ { "$ref": "#/components/parameters/CampaignId" } ],
       "post": {

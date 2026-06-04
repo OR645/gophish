@@ -26,12 +26,12 @@
                     <div class="legend" id="funnelLegend" style="margin-top:18px;"></div>
                 </div>
             </div>
-            <div class="panel" style="display:flex;flex-direction:column;">
+            <div class="panel panel-scroll">
                 <div class="panel-head">
                     <div><h3>Live Activity</h3></div>
                     <div class="head-actions"><span class="pill pill-active"><span class="dot"></span>Live</span></div>
                 </div>
-                <div class="panel-body feed" id="liveFeed" style="padding-top:6px;padding-bottom:6px;overflow-y:auto;max-height:290px;"></div>
+                <div class="panel-body"><div class="scroll-inner feed" id="liveFeed" style="padding-top:6px;padding-bottom:6px;"></div></div>
             </div>
         </div>
 
@@ -50,9 +50,9 @@
                 </div>
                 <div class="panel-body" id="engagementChart"></div>
             </div>
-            <div class="panel">
+            <div class="panel panel-scroll">
                 <div class="panel-head"><div><h3>Risk by Campaign</h3><div class="sub">submission rate</div></div></div>
-                <div class="panel-body stack" id="riskList" style="gap:13px;"></div>
+                <div class="panel-body"><div class="scroll-inner stack" id="riskList" style="gap:13px;"></div></div>
             </div>
         </div>
 
