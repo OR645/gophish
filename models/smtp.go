@@ -185,7 +185,12 @@ func GetSMTP(id int64, uid int64) (SMTP, error) {
 // GetSMTPByName returns the SMTP, if it exists, specified by the given name and user_id.
 func GetSMTPByName(n string, uid int64) (SMTP, error) {
 	s := SMTP{}
-	err := db.Where("user_id=? and name=?", uid, n).Find(&s).Error
+	// Administrators may reference any sending profile (matches GetSMTPs).
+	query := db.Where("name=?", n)
+	if !userIsAdmin(uid) {
+		query = query.Where("user_id=?", uid)
+	}
+	err := query.Find(&s).Error
 	if err != nil {
 		log.Error(err)
 		return s, err

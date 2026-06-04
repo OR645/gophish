@@ -112,7 +112,12 @@ func GetTemplate(id int64, uid int64) (Template, error) {
 // GetTemplateByName returns the template, if it exists, specified by the given name and user_id.
 func GetTemplateByName(n string, uid int64) (Template, error) {
 	t := Template{}
-	err := db.Where("user_id=? and name=?", uid, n).Find(&t).Error
+	// Administrators may reference any template (matches GetTemplates).
+	query := db.Where("name=?", n)
+	if !userIsAdmin(uid) {
+		query = query.Where("user_id=?", uid)
+	}
+	err := query.Find(&t).Error
 	if err != nil {
 		log.Error(err)
 		return t, err

@@ -122,7 +122,12 @@ func GetPage(id int64, uid int64) (Page, error) {
 // GetPageByName returns the page, if it exists, specified by the given name and user_id.
 func GetPageByName(n string, uid int64) (Page, error) {
 	p := Page{}
-	err := db.Where("user_id=? and name=?", uid, n).Find(&p).Error
+	// Administrators may reference any page (matches GetPages).
+	query := db.Where("name=?", n)
+	if !userIsAdmin(uid) {
+		query = query.Where("user_id=?", uid)
+	}
+	err := query.Find(&p).Error
 	if err != nil {
 		log.Error(err)
 	}

@@ -35,6 +35,10 @@ type Result struct {
 	SendDate     time.Time `json:"send_date"`
 	Reported     bool      `json:"reported" sql:"not null"`
 	ModifiedDate time.Time `json:"modified_date"`
+	// TemplateId records which email template was assigned to this recipient.
+	// It is 0 for campaigns with a single template (the campaign's template is
+	// used) and set when a campaign rotates between multiple templates.
+	TemplateId int64 `json:"template_id"`
 	BaseRecipient
 }
 

@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"math/rand"
 	"net/url"
 	"time"
 
@@ -22,16 +23,33 @@ type Campaign struct {
 	CompletedDate time.Time `json:"completed_date"`
 	TemplateId    int64     `json:"-"`
 	Template      Template  `json:"template"`
-	PageId        int64     `json:"-"`
-	Page          Page      `json:"page"`
-	Status        string    `json:"status"`
-	Results       []Result  `json:"results,omitempty"`
-	Groups        []Group   `json:"groups,omitempty"`
-	Events        []Event   `json:"timeline,omitempty"`
-	SMTPId        int64     `json:"-"`
-	SMTP          SMTP      `json:"smtp"`
-	URL           string    `json:"url"`
-	CompanyId     int64     `json:"company_id"`
+	// Templates is the optional pool of email templates for this campaign.
+	// When more than one is provided, each recipient is randomly assigned one
+	// of them at launch time. The pool is persisted in the campaign_templates
+	// join table; Template (above) remains the first entry for compatibility.
+	Templates []Template `json:"templates,omitempty" gorm:"-"`
+	PageId    int64      `json:"-"`
+	Page      Page       `json:"page"`
+	Status    string     `json:"status"`
+	Results   []Result   `json:"results,omitempty"`
+	Groups    []Group    `json:"groups,omitempty"`
+	Events    []Event    `json:"timeline,omitempty"`
+	SMTPId    int64      `json:"-"`
+	SMTP      SMTP       `json:"smtp"`
+	URL       string     `json:"url"`
+	CompanyId int64      `json:"company_id"`
+}
+
+// CampaignTemplate is a join row associating a campaign with one of the email
+// templates in its rotation pool.
+type CampaignTemplate struct {
+	CampaignId int64 `json:"campaign_id"`
+	TemplateId int64 `json:"template_id"`
+}
+
+// TableName specifies the database table name for Gorm to use.
+func (ct CampaignTemplate) TableName() string {
+	return "campaign_templates"
 }
 
 // CampaignResults is a struct representing the results from a campaign
@@ -142,7 +160,7 @@ func (c *Campaign) Validate() error {
 		return ErrCampaignNameNotSpecified
 	case len(c.Groups) == 0:
 		return ErrGroupNotSpecified
-	case c.Template.Name == "":
+	case c.Template.Name == "" && len(c.Templates) == 0:
 		return ErrTemplateNotSpecified
 	case c.Page.Name == "":
 		return ErrPageNotSpecified
@@ -209,6 +227,17 @@ func (c *Campaign) getDetails() error {
 	if err != nil && err != gorm.ErrRecordNotFound {
 		log.Warn(err)
 		return err
+	}
+	// Load the template rotation pool, if this campaign has one.
+	ts := []Template{}
+	err = db.Table("templates").
+		Joins("inner join campaign_templates ct on ct.template_id = templates.id").
+		Where("ct.campaign_id = ?", c.Id).Find(&ts).Error
+	if err != nil && err != gorm.ErrRecordNotFound {
+		log.Warn(err)
+	}
+	if len(ts) > 0 {
+		c.Templates = ts
 	}
 	err = db.Table("pages").Where("id=?", c.PageId).Find(&c.Page).Error
 	if err != nil {
@@ -521,19 +550,35 @@ func PostCampaign(c *Campaign, uid int64) error {
 		}
 		totalRecipients += len(c.Groups[i].Targets)
 	}
-	// Check to make sure the template exists
-	t, err := GetTemplateByName(c.Template.Name, uid)
-	if err == gorm.ErrRecordNotFound {
-		log.WithFields(logrus.Fields{
-			"template": c.Template.Name,
-		}).Error("Template does not exist")
-		return ErrTemplateNotFound
-	} else if err != nil {
-		log.Error(err)
-		return err
+	// Resolve the template pool. Campaigns may specify a single template
+	// (c.Template) or several (c.Templates); when several are given, each
+	// recipient gets a randomly assigned template from the pool.
+	templateRefs := c.Templates
+	if len(templateRefs) == 0 {
+		templateRefs = []Template{c.Template}
 	}
-	c.Template = t
-	c.TemplateId = t.Id
+	templatePool := make([]Template, 0, len(templateRefs))
+	seenTemplates := make(map[int64]bool)
+	for _, ref := range templateRefs {
+		t, err := GetTemplateByName(ref.Name, uid)
+		if err == gorm.ErrRecordNotFound {
+			log.WithFields(logrus.Fields{
+				"template": ref.Name,
+			}).Error("Template does not exist")
+			return ErrTemplateNotFound
+		} else if err != nil {
+			log.Error(err)
+			return err
+		}
+		if seenTemplates[t.Id] {
+			continue
+		}
+		seenTemplates[t.Id] = true
+		templatePool = append(templatePool, t)
+	}
+	c.Templates = templatePool
+	c.Template = templatePool[0]
+	c.TemplateId = templatePool[0].Id
 	// Check to make sure the page exists
 	p, err := GetPageByName(c.Page.Name, uid)
 	if err == gorm.ErrRecordNotFound {
@@ -580,6 +625,17 @@ func PostCampaign(c *Campaign, uid int64) error {
 	if err != nil {
 		log.Error(err)
 	}
+	// Persist the template rotation pool (only when there is more than one
+	// template; single-template campaigns are fully described by TemplateId).
+	if len(templatePool) > 1 {
+		for _, t := range templatePool {
+			err = db.Save(&CampaignTemplate{CampaignId: c.Id, TemplateId: t.Id}).Error
+			if err != nil {
+				log.Error(err)
+				return err
+			}
+		}
+	}
 	// Insert all the results
 	resultMap := make(map[string]bool)
 	recipientIndex := 0
@@ -594,6 +650,12 @@ func PostCampaign(c *Campaign, uid int64) error {
 			}
 			resultMap[t.Email] = true
 			sendDate := c.generateSendDate(recipientIndex, totalRecipients)
+			// Randomly assign a template from the rotation pool to this
+			// recipient (only recorded when there is an actual pool).
+			resultTemplateId := int64(0)
+			if len(templatePool) > 1 {
+				resultTemplateId = templatePool[rand.Intn(len(templatePool))].Id
+			}
 			r := &Result{
 				BaseRecipient: BaseRecipient{
 					Email:     t.Email,
@@ -607,6 +669,7 @@ func PostCampaign(c *Campaign, uid int64) error {
 				SendDate:     sendDate,
 				Reported:     false,
 				ModifiedDate: c.CreatedDate,
+				TemplateId:   resultTemplateId,
 			}
 			err = r.GenerateId(tx)
 			if err != nil {
@@ -670,6 +733,11 @@ func DeleteCampaign(id int64) error {
 		return err
 	}
 	err = db.Where("campaign_id=?", id).Delete(&MailLog{}).Error
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	err = db.Where("campaign_id=?", id).Delete(&CampaignTemplate{}).Error
 	if err != nil {
 		log.Error(err)
 		return err

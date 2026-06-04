@@ -17,6 +17,7 @@ import (
 	"github.com/gophish/gophish/config"
 	log "github.com/gophish/gophish/logger"
 	"github.com/gophish/gophish/mailer"
+	"github.com/jinzhu/gorm"
 )
 
 // MaxSendAttempts set to 8 since we exponentially backoff after each failed send
@@ -219,7 +220,24 @@ func (m *MailLog) Generate(msg *gomail.Message) error {
 		c = &campaign
 	}
 
-	f, err := mail.ParseAddress(c.Template.EnvelopeSender)
+	// Campaigns with a template rotation pool assign each recipient its own
+	// template (Result.TemplateId); fall back to the campaign's template.
+	tmpl := c.Template
+	if r.TemplateId != 0 && r.TemplateId != c.Template.Id {
+		t := Template{}
+		err = db.Where("id=?", r.TemplateId).Find(&t).Error
+		if err != nil {
+			log.Warnf("%s: assigned template %d not found for result, using campaign template", err, r.TemplateId)
+		} else {
+			err = db.Where("template_id=?", t.Id).Find(&t.Attachments).Error
+			if err != nil && err != gorm.ErrRecordNotFound {
+				return err
+			}
+			tmpl = t
+		}
+	}
+
+	f, err := mail.ParseAddress(tmpl.EnvelopeSender)
 	if err != nil {
 		f, err = mail.ParseAddress(c.SMTP.FromAddress)
 		if err != nil {
@@ -263,7 +281,7 @@ func (m *MailLog) Generate(msg *gomail.Message) error {
 	}
 
 	// Parse remaining templates
-	subject, err := ExecuteTemplate(c.Template.Subject, ptx)
+	subject, err := ExecuteTemplate(tmpl.Subject, ptx)
 
 	if err != nil {
 		log.Warn(err)
@@ -274,26 +292,26 @@ func (m *MailLog) Generate(msg *gomail.Message) error {
 	}
 
 	msg.SetHeader("To", r.FormatAddress())
-	if c.Template.Text != "" {
-		text, err := ExecuteTemplate(c.Template.Text, ptx)
+	if tmpl.Text != "" {
+		text, err := ExecuteTemplate(tmpl.Text, ptx)
 		if err != nil {
 			log.Warn(err)
 		}
 		msg.SetBody("text/plain", text)
 	}
-	if c.Template.HTML != "" {
-		html, err := ExecuteTemplate(c.Template.HTML, ptx)
+	if tmpl.HTML != "" {
+		html, err := ExecuteTemplate(tmpl.HTML, ptx)
 		if err != nil {
 			log.Warn(err)
 		}
-		if c.Template.Text == "" {
+		if tmpl.Text == "" {
 			msg.SetBody("text/html", html)
 		} else {
 			msg.AddAlternative("text/html", html)
 		}
 	}
 	// Attach the files
-	for _, a := range c.Template.Attachments {
+	for _, a := range tmpl.Attachments {
 		addAttachment(msg, a, ptx)
 	}
 

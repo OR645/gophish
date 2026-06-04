@@ -11,109 +11,93 @@ var labels = {
 var campaigns = []
 var campaign = {}
 
-// smtpProfiles caches the sending profiles loaded for the wizard so the
-// company -> domain auto-wiring can select a profile whose From address matches
-// the company's domain. campaignDomains caches the domains for the same reason.
-var smtpProfiles = []
-var campaignDomains = []
-
-// applyCompanyDomain wires a selected company's domain into the wizard: it
-// auto-fills the listener URL (https://<domain>) and selects an existing
-// sending profile whose From address ends in @<domain>. If no profile matches,
-// a hint is shown in the sending-profile step. Selecting a company is a
-// deliberate action, so this intentionally overrides the URL / profile.
-function applyCompanyDomain(companyId) {
-    var hint = $("#domainProfileHint")
-    if (!companyId) {
-        hint.hide()
-        return
-    }
-    var domain = campaignDomains.find(function (d) {
-        return String(d.company_id) === String(companyId)
-    })
-    if (!domain || !domain.name) {
-        hint.hide()
-        return
-    }
-    // Auto-fill the listener URL from the domain.
-    setURLValue("https://" + domain.name)
-    saveURL("https://" + domain.name)
-    // Auto-select a sending profile whose From address matches the domain.
-    var suffix = "@" + domain.name.toLowerCase()
-    var match = smtpProfiles.find(function (p) {
-        return p.from_address && p.from_address.toLowerCase().indexOf(suffix) !== -1
-    })
-    if (match) {
-        $("#profile").val(String(match.id)).trigger("change.select2").trigger("change")
-        hint.hide()
-    } else {
-        hint.html('<i class="fa fa-info-circle"></i>&nbsp;No sending profile uses <b>' + escapeHtml(domain.name) +
-            '</b>. Create one with a From address like <span class="soc-mono">phish@' + escapeHtml(domain.name) + '</span>.').show()
-    }
+// wizData caches the option lists loaded for the wizard. The listener URL and
+// the sending profiles are both derived from the Domains tab: the URL list is
+// exactly the managed domains, and only profiles whose From address belongs to
+// a managed domain are eligible.
+var wizData = {
+    templates: [],
+    pages: [],
+    profiles: [],
+    groups: [],
+    domains: []
 }
 
-// ---- Saved URLs (picker) --------------------------------------------------
-// A list of phishing-listener URLs is persisted in the browser's localStorage
-// so the same URLs can be reused across several parallel campaigns without
-// retyping. (Stored client-side because this build ships frontend-only.)
-var SAVED_URLS_KEY = "gophish.savedURLs"
-
-function getSavedURLs() {
-    try {
-        return JSON.parse(localStorage.getItem(SAVED_URLS_KEY)) || []
-    } catch (e) {
-        return []
-    }
+// wizState tracks the user's current selections. Card clicks mutate this
+// state and the render/sync helpers reflect it back into the DOM, so there is
+// no hidden select2 layer to fall out of sync.
+var wizState = {
+    templates: [], // template ids (multi — rotated randomly between recipients)
+    page: null,    // page id
+    profile: null, // sending profile id
+    groups: [],    // group ids
+    url: ""        // listener URL (always https://<managed domain>)
 }
 
-function saveURL(url) {
-    url = $.trim(url || "")
-    if (url === "") {
-        return
-    }
-    var urls = getSavedURLs()
-    if (urls.indexOf(url) === -1) {
-        urls.push(url)
-        localStorage.setItem(SAVED_URLS_KEY, JSON.stringify(urls))
-    }
+function wizResetState() {
+    wizState.templates = []
+    wizState.page = null
+    wizState.profile = null
+    wizState.groups = []
+    wizState.url = ""
 }
 
-function removeSavedURL(url) {
-    var urls = getSavedURLs().filter(function (u) {
-        return u !== url
-    })
-    localStorage.setItem(SAVED_URLS_KEY, JSON.stringify(urls))
+// wizFind returns the cached item with the given id (ids come back from the
+// API as numbers; jQuery's .data() also yields numbers, so === is safe).
+function wizFind(list, id) {
+    for (var i = 0; i < list.length; i++) {
+        if (list[i].id === id) {
+            return list[i]
+        }
+    }
+    return null
 }
 
-// Initialize the #url select2 as a tag input sourced from the saved URLs.
-// Picking an entry selects it; typing a new value creates (and on launch saves)
-// a new entry.
+function wizSelectedTemplates() {
+    return wizState.templates.map(function (id) {
+        return wizFind(wizData.templates, id)
+    }).filter(Boolean)
+}
+
+function wizSelectedGroups() {
+    return wizState.groups.map(function (id) {
+        return wizFind(wizData.groups, id)
+    }).filter(Boolean)
+}
+
+// ---- Listener URL (sourced from the Domains tab only) ----------------------
+// The URL select offers exactly the managed domains as https://<domain> — no
+// free-text entry, so a campaign can never point at a domain that wasn't
+// provisioned through the Domains tab.
 function setupURLSelect() {
     var $url = $("#url")
-    var data = getSavedURLs().map(function (u) {
-        return { id: u, text: u }
-    })
     if ($url.hasClass("select2-hidden-accessible")) {
         $url.select2("destroy")
-        $url.empty().append("<option></option>")
     }
-    $url.select2({
-        placeholder: "http://192.168.1.1",
-        tags: true,
-        data: data,
-        createTag: function (params) {
-            var term = $.trim(params.term)
-            if (term === "") {
-                return null
-            }
-            return { id: term, text: term }
-        }
+    $url.empty().append("<option></option>")
+    var data = wizData.domains.filter(function (d) { return d.name }).map(function (d) {
+        return { id: "https://" + d.name, text: "https://" + d.name }
     })
+    $url.select2({
+        placeholder: data.length ? "Select a domain" : "No domains available",
+        allowClear: true,
+        data: data
+    })
+    if (!data.length) {
+        $("#urlNote").html('No domains found — add one in the <a href="/domains">Domains</a> tab first.')
+    } else {
+        $("#urlNote").text("")
+    }
+    if (wizState.url) {
+        setURLValue(wizState.url)
+    }
 }
 
 // Set the #url select to a specific value, adding it as an option first if it
-// isn't already known (used when copying an existing campaign).
+// isn't already known (used when copying an existing campaign whose domain may
+// have since been removed).
 function setURLValue(url) {
+    wizState.url = url || ""
     var $url = $("#url")
     if (url) {
         var exists = false
@@ -126,35 +110,54 @@ function setURLValue(url) {
             $url.append(new Option(url, url, true, true))
         }
     }
-    $url.val(url || null).trigger("change")
+    $url.val(url || null).trigger("change.select2")
+    wizUpdatePreview()
 }
 
-function renderSavedURLList() {
-    var urls = getSavedURLs()
-    if (!urls.length) {
-        return '<div style="color:#888;padding:8px 0;">No saved URLs yet. Type a URL when creating a campaign and it will be saved here.</div>'
+// ---- Domain-driven auto-wiring ---------------------------------------------
+// applyCompanyDomain wires a selected company's domain into the wizard: it
+// auto-fills the listener URL (https://<domain>) and selects an eligible
+// sending profile whose From address ends in @<domain>. If no profile matches,
+// a hint is shown in the sending-profile section. Selecting a company is a
+// deliberate action, so this intentionally overrides the URL / profile.
+function applyCompanyDomain(companyId) {
+    var hint = $("#domainProfileHint")
+    if (!companyId) {
+        hint.hide()
+        return
     }
-    return '<ul style="list-style:none;padding:0;margin:0;">' + urls.map(function (u) {
-        return '<li style="display:flex;align-items:center;justify-content:space-between;padding:6px 4px;border-bottom:1px solid #eee;">' +
-            '<span style="word-break:break-all;margin-right:8px;">' + escapeHtml(u) + '</span>' +
-            '<button type="button" class="btn btn-sm btn-danger remove-url-btn" data-url="' + escapeHtml(u) + '" title="Remove">' +
-            '<i class="fa fa-trash-o"></i></button>' +
-            '</li>'
-    }).join("") + '</ul>'
+    var domain = wizData.domains.find(function (d) {
+        return String(d.company_id) === String(companyId)
+    })
+    if (!domain || !domain.name) {
+        hint.hide()
+        return
+    }
+    // Auto-fill the listener URL from the domain.
+    setURLValue("https://" + domain.name)
+    // Auto-select a sending profile whose From address matches the domain.
+    var suffix = "@" + domain.name.toLowerCase()
+    var match = wizData.profiles.find(function (p) {
+        return p.from_address && p.from_address.toLowerCase().indexOf(suffix) !== -1
+    })
+    if (match) {
+        wizState.profile = match.id
+        wizSyncAll()
+        wizUpdatePreview()
+        hint.hide()
+    } else {
+        hint.html('<i class="fa fa-info-circle"></i>&nbsp;No sending profile uses <b>' + escapeHtml(domain.name) +
+            '</b>. Create one with a From address like <span class="soc-mono">admin@' + escapeHtml(domain.name) + '</span>.').show()
+    }
 }
 
-// Open a small dialog listing the saved URLs with the ability to delete them.
-function manageURLs() {
-    Swal.fire({
-        title: "Saved URLs",
-        html: '<div class="url-list-wrap" style="text-align:left;">' + renderSavedURLList() + '</div>',
-        showConfirmButton: false,
-        showCloseButton: true
-    })
-    $(document).off("click.removeurl").on("click.removeurl", ".remove-url-btn", function () {
-        removeSavedURL($(this).attr("data-url"))
-        $(".url-list-wrap").html(renderSavedURLList())
-        setupURLSelect()
+// profileMatchesDomains reports whether a sending profile's From address
+// belongs to one of the managed domains. Only such profiles are offered in the
+// wizard — mailboxes that don't exist on a managed domain can't be used.
+function profileMatchesDomains(p) {
+    var from = (p.from_address || "").toLowerCase()
+    return wizData.domains.some(function (d) {
+        return d.name && from.indexOf("@" + d.name.toLowerCase()) !== -1
     })
 }
 
@@ -264,8 +267,40 @@ function renderCampaignKpis(cs) {
     }).join("")
 }
 
+// wizValidate checks that every required selection has been made before
+// launch. On failure it shows the message and jumps to the offending step.
+function wizValidate() {
+    var fail = function (msg, step) {
+        showStep(step)
+        modalError(msg)
+        return false
+    }
+    if ($.trim($("#name").val()) === "") {
+        return fail("Please give the campaign a name.", 0)
+    }
+    if (!wizState.templates.length) {
+        return fail("Select at least one email template.", 0)
+    }
+    if (!wizState.page) {
+        return fail("Select a landing page.", 1)
+    }
+    if (!wizState.url) {
+        return fail("Select a listener URL (domain).", 1)
+    }
+    if (!wizState.profile) {
+        return fail("Select a sending profile.", 1)
+    }
+    if (!wizState.groups.length) {
+        return fail("Select at least one target group.", 1)
+    }
+    return true
+}
+
 // Launch attempts to POST to /campaigns/
 function launch() {
+    if (!wizValidate()) {
+        return
+    }
     Swal.fire({
         title: "Are you sure?",
         text: "This will schedule the campaign to be launched.",
@@ -279,12 +314,14 @@ function launch() {
         showLoaderOnConfirm: true,
         preConfirm: function () {
             return new Promise(function (resolve, reject) {
-                groups = []
-                $("#users").select2("data").forEach(function (group) {
-                    groups.push({
-                        name: group.text
-                    });
+                var templates = wizSelectedTemplates().map(function (t) {
+                    return { name: t.name }
                 })
+                var groups = wizSelectedGroups().map(function (g) {
+                    return { name: g.name }
+                })
+                var page = wizFind(wizData.pages, wizState.page)
+                var profile = wizFind(wizData.profiles, wizState.profile)
                 // Validate our fields
                 var send_by_date = $("#send_by_date").val()
                 if (send_by_date != "") {
@@ -292,23 +329,22 @@ function launch() {
                 }
                 campaign = {
                     name: $("#name").val(),
-                    template: {
-                        name: $("#template").select2("data")[0].text
-                    },
-                    url: $("#url").val(),
+                    // template stays the first selection for compatibility;
+                    // templates carries the full rotation pool.
+                    template: templates[0],
+                    templates: templates,
+                    url: wizState.url,
                     page: {
-                        name: $("#page").select2("data")[0].text
+                        name: page ? page.name : ""
                     },
                     smtp: {
-                        name: $("#profile").select2("data")[0].text
+                        name: profile ? profile.name : ""
                     },
                     launch_date: moment($("#launch_date").val(), "MMMM Do YYYY, h:mm a").utc().format(),
                     send_by_date: send_by_date || null,
                     groups: groups,
                     company_id: parseInt($("#company").val(), 10) || 0,
                 }
-                // Remember this URL so it can be reused for parallel campaigns
-                saveURL(campaign.url)
                 // Submit the campaign
                 api.campaigns.post(campaign)
                     .success(function (data) {
@@ -338,23 +374,30 @@ function launch() {
 
 // Attempts to send a test email by POSTing to /campaigns/
 function sendTestEmail() {
+    var templates = wizSelectedTemplates()
+    var page = wizFind(wizData.pages, wizState.page)
+    var profile = wizFind(wizData.profiles, wizState.profile)
+    if (!templates.length || !page || !profile || !wizState.url) {
+        $("#sendTestEmailModal\\.flashes").empty().append("<div style=\"text-align:center\" class=\"alert alert-danger\">\
+            <i class=\"fa fa-exclamation-circle\"></i> Select a template, landing page, URL and sending profile first.</div>")
+        return
+    }
     var test_email_request = {
         template: {
-            name: $("#template").select2("data")[0].text
+            name: templates[0].name
         },
         first_name: $("input[name=to_first_name]").val(),
         last_name: $("input[name=to_last_name]").val(),
         email: $("input[name=to_email]").val(),
         position: $("input[name=to_position]").val(),
-        url: $("#url").val(),
+        url: wizState.url,
         page: {
-            name: $("#page").select2("data")[0].text
+            name: page.name
         },
         smtp: {
-            name: $("#profile").select2("data")[0].text
+            name: profile.name
         }
     }
-    saveURL(test_email_request.url)
     btnHtml = $("#sendTestModalSubmit").html()
     $("#sendTestModalSubmit").html('<i class="fa fa-spinner fa-spin"></i> Sending')
     // Send the test email
@@ -374,12 +417,12 @@ function sendTestEmail() {
 function dismiss() {
     $("#modal\\.flashes").empty();
     $("#name").val("");
-    $("#template").val("").change();
-    $("#page").val("").change();
-    $("#url").val(null).trigger("change");
-    $("#profile").val("").change();
-    $("#users").val("").change();
+    wizResetState()
+    $("#url").val(null).trigger("change.select2");
     $("#company").val(null).trigger("change");
+    $("#domainProfileHint").hide()
+    wizSyncAll()
+    wizUpdatePreview()
     $("#modal").modal('hide');
 }
 
@@ -452,125 +495,92 @@ function loadCompanies(selectedId) {
         })
 }
 
+// loadProfiles fetches the sending profiles and keeps only those whose From
+// address belongs to a managed domain. Must run after the domains have loaded.
+function loadProfiles() {
+    api.SMTP.get()
+        .success(function (profiles) {
+            profiles = profiles || []
+            wizData.profiles = profiles.filter(profileMatchesDomains)
+            wizRenderProfiles()
+            if (profiles.length === 0) {
+                modalError("No sending profiles found!")
+            } else if (wizData.profiles.length === 1 && !wizState.profile) {
+                wizState.profile = wizData.profiles[0].id
+                wizSyncAll()
+                wizUpdatePreview()
+            }
+        })
+        .error(function () {
+            wizData.profiles = []
+            wizRenderProfiles()
+        })
+}
+
 function setupOptions() {
-    setupURLSelect()
     loadCompanies()
-    // Cache domains so selecting a company can auto-wire its domain into the
-    // listener URL and matching sending profile.
+    // The Domains tab drives both the listener URL options and which sending
+    // profiles are eligible, so profiles are loaded after the domains arrive.
     api.domains.get()
-        .success(function (ds) { campaignDomains = ds || [] })
-        .error(function () { campaignDomains = [] })
+        .success(function (ds) {
+            wizData.domains = ds || []
+            setupURLSelect()
+            loadProfiles()
+            // With a single managed domain there is nothing to choose — use it.
+            if (wizData.domains.length === 1 && !wizState.url && wizData.domains[0].name) {
+                setURLValue("https://" + wizData.domains[0].name)
+            }
+        })
+        .error(function () {
+            wizData.domains = []
+            setupURLSelect()
+            loadProfiles()
+        })
     api.groups.summary()
         .success(function (summaries) {
-            groups = summaries.groups
-            if (groups.length == 0) {
-                wizRenderGroups([])
+            wizData.groups = summaries.groups || []
+            wizRenderGroups()
+            if (wizData.groups.length == 0) {
                 modalError("No groups found!")
-                return false;
-            } else {
-                var group_s2 = $.map(groups, function (obj) {
-                    obj.text = obj.name
-                    obj.title = obj.num_targets + " targets"
-                    return obj
-                });
-                $("#users.form-control").select2({
-                    placeholder: "Select Groups",
-                    data: group_s2,
-                });
-                wizRenderGroups(group_s2)
             }
         });
     api.templates.get()
         .success(function (templates) {
-            if (templates.length == 0) {
-                wizRenderSingle("#templateChoices", [], "#template")
+            wizData.templates = templates || []
+            wizRenderTemplates()
+            if (wizData.templates.length == 0) {
                 modalError("No templates found!")
-                return false
-            } else {
-                var template_s2 = $.map(templates, function (obj) {
-                    obj.text = obj.name
-                    return obj
-                });
-                var template_select = $("#template.form-control")
-                template_select.select2({
-                    placeholder: "Select a Template",
-                    data: template_s2,
-                });
-                wizRenderSingle("#templateChoices", template_s2, "#template", function (t) { return t.subject || "" })
-                if (templates.length === 1) {
-                    template_select.val(template_s2[0].id)
-                    template_select.trigger('change.select2')
-                }
+            } else if (wizData.templates.length === 1 && !wizState.templates.length) {
+                wizState.templates = [wizData.templates[0].id]
+                wizSyncAll()
+                wizUpdatePreview()
             }
         });
     api.pages.get()
         .success(function (pages) {
-            if (pages.length == 0) {
-                wizRenderSingle("#pageChoices", [], "#page")
+            wizData.pages = pages || []
+            wizRenderPages()
+            if (wizData.pages.length == 0) {
                 modalError("No pages found!")
-                return false
-            } else {
-                var page_s2 = $.map(pages, function (obj) {
-                    obj.text = obj.name
-                    return obj
-                });
-                var page_select = $("#page.form-control")
-                page_select.select2({
-                    placeholder: "Select a Landing Page",
-                    data: page_s2,
-                });
-                wizRenderSingle("#pageChoices", page_s2, "#page",
-                    function (p) { return p.redirect_url || "" },
-                    function (p) { return p.capture_credentials ? '<span class="tag" style="color:var(--c-submitted);">captures creds</span>' : '<span class="tag">clicks only</span>' })
-                if (pages.length === 1) {
-                    page_select.val(page_s2[0].id)
-                    page_select.trigger('change.select2')
-                }
-            }
-        });
-    api.SMTP.get()
-        .success(function (profiles) {
-            if (profiles.length == 0) {
-                wizRenderSingle("#profileChoices", [], "#profile")
-                modalError("No profiles found!")
-                return false
-            } else {
-                smtpProfiles = profiles
-                var profile_s2 = $.map(profiles, function (obj) {
-                    obj.text = obj.name
-                    return obj
-                });
-                var profile_select = $("#profile.form-control")
-                profile_select.select2({
-                    placeholder: "Select a Sending Profile",
-                    data: profile_s2,
-                }).select2("val", profile_s2[0]);
-                wizRenderSingle("#profileChoices", profile_s2, "#profile",
-                    function (p) { return p.from_address || p.host || "" },
-                    function (p) { return p.ignore_cert_errors ? '<span class="pill pill-clicked"><span class="dot"></span>Check certs</span>' : '<span class="pill pill-reported"><span class="dot"></span>TLS</span>' })
-                if (profiles.length === 1) {
-                    profile_select.val(profile_s2[0].id)
-                    profile_select.trigger('change.select2')
-                }
+            } else if (wizData.pages.length === 1 && !wizState.page) {
+                wizState.page = wizData.pages[0].id
+                wizSyncAll()
+                wizUpdatePreview()
             }
         });
 }
 
 /* ============================================================
    SOC cx campaign wizard
-   Drives the hidden #template/#page/#profile/#users select2 data
-   layer via a stepper + choice cards + a live preview aside, so
-   launch()/copy()/sendTestEmail()/dismiss() keep working unchanged.
+   A compact 3-step flow: Campaign (name/company/templates),
+   Delivery (page/URL/profile/targets) and Review & Launch.
+   Card clicks mutate wizState; sync helpers mark the cards.
    ============================================================ */
-var WIZ_LABELS = ["Details", "Email", "Page", "Profile", "Targets", "Schedule", "Review"]
+var WIZ_LABELS = ["Campaign", "Delivery", "Review"]
 var WIZ_DESC = [
-    "Name your simulation and pick a company.",
-    "Pick the phishing email targets will receive.",
-    "Choose the landing page and listener URL.",
-    "Select the SMTP profile used to deliver mail.",
-    "Choose which groups to include.",
-    "Set the launch time and delivery window.",
-    "Confirm everything, then launch."
+    "Name the simulation, pick a company and choose the email templates.",
+    "Choose the landing page, listener domain, sender and targets.",
+    "Set the schedule, confirm everything, then launch."
 ]
 var wizStep = 0
 
@@ -603,12 +613,9 @@ function showStep(i) {
 function wizNext() { if (wizStep < WIZ_LABELS.length - 1) { showStep(wizStep + 1) } }
 function wizBack() { if (wizStep === 0) { $("#modal").modal("hide") } else { showStep(wizStep - 1) } }
 
-function wizSelText(sel) {
-    try { var d = $(sel).select2("data"); return (d && d[0]) ? d[0].text : "" } catch (e) { return "" }
-}
 function wizRecipients() {
     var n = 0
-    $("#groupChoices .choice.sel").each(function () { n += parseInt($(this).attr("data-targets") || "0", 10) || 0 })
+    wizSelectedGroups().forEach(function (g) { n += g.num_targets || 0 })
     return n
 }
 function wizRow(icon, label, val, accent) {
@@ -617,14 +624,25 @@ function wizRow(icon, label, val, accent) {
         '<div style="min-width:0;"><div class="sl">' + label + '</div>' +
         '<div class="sv" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(String(val)) + '</div></div></div>'
 }
+function wizTemplatesLabel() {
+    var ts = wizSelectedTemplates()
+    if (!ts.length) { return "—" }
+    if (ts.length === 1) { return ts[0].name }
+    return ts.length + " templates (random rotation)"
+}
+function wizSingleName(list, id) {
+    var it = id !== null ? wizFind(list, id) : null
+    return it ? it.name : "—"
+}
 function wizUpdatePreview() {
     if (!$("#previewSummary").length) { return }
     var recips = wizRecipients()
     $("#previewSummary").html(
         wizRow("bullseye", "Simulation", $("#name").val() || "Untitled", true) +
-        wizRow("envelope-o", "Template", wizSelText("#template") || "—") +
-        wizRow("file-o", "Page", wizSelText("#page") || "—") +
-        wizRow("paper-plane-o", "Profile", wizSelText("#profile") || "—") +
+        wizRow("envelope-o", "Template" + (wizState.templates.length > 1 ? "s" : ""), wizTemplatesLabel()) +
+        wizRow("file-o", "Page", wizSingleName(wizData.pages, wizState.page)) +
+        wizRow("link", "URL", wizState.url || "—") +
+        wizRow("paper-plane-o", "Profile", wizSingleName(wizData.profiles, wizState.profile)) +
         wizRow("users", "Recipients", recips.toLocaleString())
     )
     var funnel = [
@@ -638,17 +656,20 @@ function wizUpdatePreview() {
         return '<div class="pf"><span class="pl">' + f[0] + '</span><span class="pt"><i style="width:' +
             Math.max(4, (f[1] / max) * 100) + '%;background:' + f[2] + '"></i></span><span class="pv">' + f[1].toLocaleString() + '</span></div>'
     }).join(""))
-    var ng = $("#groupChoices .choice.sel").length
+    var ng = wizState.groups.length
     $("#recipientsNote").text(recips.toLocaleString() + " recipients across " + ng + " group" + (ng === 1 ? "" : "s"))
+    var nt = wizState.templates.length
+    $("#templatesNote").text(nt > 1 ? nt + " templates selected — each recipient will receive one of them at random" : "")
 }
 function wizRenderReview() {
-    var ng = $("#groupChoices .choice.sel").length
+    var ng = wizState.groups.length
     $("#reviewSummary").html(
         wizRow("bullseye", "Campaign", $("#name").val() || "Untitled") +
-        wizRow("envelope-o", "Email template", wizSelText("#template") || "—") +
-        wizRow("file-o", "Landing page", wizSelText("#page") || "—") +
-        wizRow("link", "Listener URL", $("#url").val() || "—") +
-        wizRow("paper-plane-o", "Sending profile", wizSelText("#profile") || "—") +
+        wizRow("envelope-o", "Email template" + (wizState.templates.length > 1 ? "s" : ""),
+            wizSelectedTemplates().map(function (t) { return t.name }).join(", ") || "—") +
+        wizRow("file-o", "Landing page", wizSingleName(wizData.pages, wizState.page)) +
+        wizRow("link", "Listener URL", wizState.url || "—") +
+        wizRow("paper-plane-o", "Sending profile", wizSingleName(wizData.profiles, wizState.profile)) +
         wizRow("users", "Recipients", wizRecipients().toLocaleString() + " across " + ng + " group" + (ng === 1 ? "" : "s")) +
         wizRow("calendar", "Launch", $("#launch_date").val() || "—")
     )
@@ -662,24 +683,41 @@ function wizChoiceHtml(id, title, sub, right) {
         (sub ? '<span class="mono" style="font-size:11px;color:var(--ink-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;">' + escapeHtml(sub) + '</span>' : '') +
         '</div>' + (right || '') + '</div>'
 }
-function wizRenderSingle(containerId, items, selId, subFn, rightFn) {
-    var $c = $(containerId)
-    if (!items || !items.length) { $c.html('<div class="minilist-empty">None available — create one first.</div>'); return }
-    $c.html(items.map(function (it) {
-        return wizChoiceHtml(it.id, it.name || it.text, subFn ? subFn(it) : "", rightFn ? rightFn(it) : "")
+function wizRenderTemplates() {
+    var $c = $("#templateChoices")
+    if (!wizData.templates.length) { $c.html('<div class="minilist-empty">None available — create one first.</div>'); return }
+    $c.html(wizData.templates.map(function (t) {
+        return wizChoiceHtml(t.id, t.name, t.subject || "")
     }).join(""))
-    wizSyncSingle(containerId, selId)
+    wizSyncAll()
 }
-function wizSyncSingle(containerId, selId) {
-    var v = String($(selId).val() || "")
-    $(containerId + " .choice").removeClass("sel").each(function () {
-        if (String($(this).data("id")) === v) { $(this).addClass("sel") }
-    })
+function wizRenderPages() {
+    var $c = $("#pageChoices")
+    if (!wizData.pages.length) { $c.html('<div class="minilist-empty">None available — create one first.</div>'); return }
+    $c.html(wizData.pages.map(function (p) {
+        return wizChoiceHtml(p.id, p.name, p.redirect_url || "",
+            p.capture_credentials ? '<span class="tag" style="color:var(--c-submitted);">captures creds</span>' : '<span class="tag">clicks only</span>')
+    }).join(""))
+    wizSyncAll()
 }
-function wizRenderGroups(items) {
+function wizRenderProfiles() {
+    var $c = $("#profileChoices")
+    if (!wizData.profiles.length) {
+        $c.html('<div class="minilist-empty">No sending profiles match your domains. Add a domain in the ' +
+            '<a href="/domains">Domains</a> tab, then create a sending profile whose From address uses it ' +
+            '(e.g. admin@your-domain).</div>')
+        return
+    }
+    $c.html(wizData.profiles.map(function (p) {
+        return wizChoiceHtml(p.id, p.name, p.from_address || p.host || "",
+            p.ignore_cert_errors ? '<span class="pill pill-clicked"><span class="dot"></span>Check certs</span>' : '<span class="pill pill-reported"><span class="dot"></span>TLS</span>')
+    }).join(""))
+    wizSyncAll()
+}
+function wizRenderGroups() {
     var $c = $("#groupChoices")
-    if (!items || !items.length) { $c.html('<div class="minilist-empty">No groups yet — create one first.</div>'); return }
-    $c.html(items.map(function (g) {
+    if (!wizData.groups.length) { $c.html('<div class="minilist-empty">No groups yet — create one first.</div>'); return }
+    $c.html(wizData.groups.map(function (g) {
         var n = g.num_targets || 0
         return '<div class="choice" data-id="' + g.id + '" data-targets="' + n + '">' +
             '<span class="ck"><i class="fa fa-check"></i></span>' +
@@ -687,58 +725,52 @@ function wizRenderGroups(items) {
             '<span class="mono" style="font-size:11px;color:var(--ink-dim);">' + n + ' targets</span></div>' +
             '<span class="num" style="font-weight:600;font-size:13px;color:var(--ink-dim);">' + n + '</span></div>'
     }).join(""))
-    wizSyncGroups()
+    wizSyncAll()
 }
-function wizSyncGroups() {
-    var vals = ($("#users").val() || []).map(String)
-    $("#groupChoices .choice").removeClass("sel").each(function () {
-        if (vals.indexOf(String($(this).data("id"))) >= 0) { $(this).addClass("sel") }
-    })
+// wizSyncAll marks the cards in every list according to wizState.
+function wizSyncAll() {
+    var mark = function (containerId, selected) {
+        $(containerId + " .choice").each(function () {
+            var id = $(this).data("id")
+            $(this).toggleClass("sel", selected.indexOf(id) >= 0)
+        })
+    }
+    mark("#templateChoices", wizState.templates)
+    mark("#pageChoices", wizState.page !== null ? [wizState.page] : [])
+    mark("#profileChoices", wizState.profile !== null ? [wizState.profile] : [])
+    mark("#groupChoices", wizState.groups)
 }
 
 function edit(campaign) {
+    wizResetState()
     setupOptions();
     showStep(0);
 }
 
 function copy(idx) {
+    wizResetState()
     setupOptions();
     showStep(0);
     // Set our initial values
     api.campaignId.get(campaigns[idx].id)
         .success(function (campaign) {
             $("#name").val("Copy of " + campaign.name)
-            if (!campaign.template.id) {
-                $("#template").val("").change();
-                $("#template").select2({
-                    placeholder: campaign.template.name
-                });
-            } else {
-                $("#template").val(campaign.template.id.toString());
-                $("#template").trigger("change.select2")
+            // Restore the template rotation pool when present, otherwise the
+            // single template.
+            var pool = (campaign.templates && campaign.templates.length) ? campaign.templates : [campaign.template]
+            wizState.templates = pool.map(function (t) { return t.id }).filter(Boolean)
+            if (campaign.page && campaign.page.id) {
+                wizState.page = campaign.page.id
             }
-            if (!campaign.page.id) {
-                $("#page").val("").change();
-                $("#page").select2({
-                    placeholder: campaign.page.name
-                });
-            } else {
-                $("#page").val(campaign.page.id.toString());
-                $("#page").trigger("change.select2")
-            }
-            if (!campaign.smtp.id) {
-                $("#profile").val("").change();
-                $("#profile").select2({
-                    placeholder: campaign.smtp.name
-                });
-            } else {
-                $("#profile").val(campaign.smtp.id.toString());
-                $("#profile").trigger("change.select2")
+            if (campaign.smtp && campaign.smtp.id) {
+                wizState.profile = campaign.smtp.id
             }
             setURLValue(campaign.url)
             if (campaign.company_id) {
                 loadCompanies(campaign.company_id)
             }
+            wizSyncAll()
+            wizUpdatePreview()
         })
         .error(function (data) {
             $("#modal\\.flashes").empty().append("<div style=\"text-align:center\" class=\"alert alert-danger\">\
@@ -793,22 +825,32 @@ $(document).ready(function () {
     $('#modal').on('hidden.bs.modal', function (event) {
         dismiss()
     });
-    $("#manageUrlsBtn").on("click", manageURLs);
-    // cx wizard: stepper + choice cards drive the hidden select2 data layer
+    // cx wizard: stepper + choice cards drive wizState
     $("#campaignStepper").on("click", ".st", function () { showStep(parseInt($(this).attr("data-step"), 10)) })
-    $("#templateChoices").on("click", ".choice", function () { $("#template").val(String($(this).data("id"))).trigger("change.select2").trigger("change") })
-    $("#pageChoices").on("click", ".choice", function () { $("#page").val(String($(this).data("id"))).trigger("change.select2").trigger("change") })
-    $("#profileChoices").on("click", ".choice", function () { $("#profile").val(String($(this).data("id"))).trigger("change.select2").trigger("change") })
-    $("#groupChoices").on("click", ".choice", function () {
-        $(this).toggleClass("sel")
-        var ids = []
-        $("#groupChoices .choice.sel").each(function () { ids.push(String($(this).data("id"))) })
-        $("#users").val(ids).trigger("change.select2").trigger("change")
+    $("#templateChoices").on("click", ".choice", function () {
+        var id = $(this).data("id")
+        var i = wizState.templates.indexOf(id)
+        if (i >= 0) { wizState.templates.splice(i, 1) } else { wizState.templates.push(id) }
+        wizSyncAll(); wizUpdatePreview()
     })
-    $("#template").on("change", function () { wizSyncSingle("#templateChoices", "#template"); wizUpdatePreview() })
-    $("#page").on("change", function () { wizSyncSingle("#pageChoices", "#page"); wizUpdatePreview() })
-    $("#profile").on("change", function () { wizSyncSingle("#profileChoices", "#profile"); wizUpdatePreview() })
-    $("#users").on("change", function () { wizSyncGroups(); wizUpdatePreview() })
+    $("#pageChoices").on("click", ".choice", function () {
+        wizState.page = $(this).data("id")
+        wizSyncAll(); wizUpdatePreview()
+    })
+    $("#profileChoices").on("click", ".choice", function () {
+        wizState.profile = $(this).data("id")
+        wizSyncAll(); wizUpdatePreview()
+    })
+    $("#groupChoices").on("click", ".choice", function () {
+        var id = $(this).data("id")
+        var i = wizState.groups.indexOf(id)
+        if (i >= 0) { wizState.groups.splice(i, 1) } else { wizState.groups.push(id) }
+        wizSyncAll(); wizUpdatePreview()
+    })
+    $("#url").on("change", function () {
+        wizState.url = $(this).val() || ""
+        wizUpdatePreview()
+    })
     // Selecting a company auto-wires its domain into the listener URL and a
     // matching sending profile. (select2 preselects fire change.select2 only,
     // so copying an existing campaign won't trigger this.)
